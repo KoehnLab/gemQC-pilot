@@ -178,7 +178,7 @@ def fitting_basis(system, options, out):
         system.df_c.basis if system.df_c is not None else None))
     system.c_used = fit_name
     try:
-        fit = build_basis(system.molecule, fit_name)
+        fit = build_basis(system.molecule, fit_name, auxiliary=True)
     except (ValueError, FileNotFoundError) as e:
         raise InputError(f"system '{system.name}': correlation fitting basis: {e}") from None
     out.value("correlation fitting basis", f"{fit_name} ({fit_how}), {fit.nbf} functions")

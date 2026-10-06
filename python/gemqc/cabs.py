@@ -152,7 +152,7 @@ def build_ri_space(mol, basis_name, C_obs, nocc, cabs_name, threshold=1e-8,
     Co = C[:, :nocc]
     h = np.asarray(_core.kinetic(ri)) + np.asarray(_core.nuclear_attraction(ri, mol))
     if jk_auxbasis is not None:
-        builder = _core.DFBuilder(ri, build_basis(mol, jk_auxbasis))
+        builder = _core.DFBuilder(ri, build_basis(mol, jk_auxbasis, auxiliary=True))
     else:
         builder = _core.FockBuilder(ri, screening)
     (J,), (K,) = builder.compute([Co @ Co.T], True, True)

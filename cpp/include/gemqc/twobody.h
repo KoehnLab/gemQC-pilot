@@ -43,9 +43,12 @@ struct TwoBodyOperator {
   static bool has_delcgtgab();
 };
 
-/// libint engine of an operator for shells up to max_l, max_nprim (braket set by caller)
+/// libint engine of an operator for shells up to max_l, max_nprim; the braket must be
+/// given here if max_l exceeds the 4-centre limit (fitting functions in 2-/3-centre
+/// integrals), else it may be set later
 libint2::Engine two_body_engine(const TwoBodyOperator& op, size_t max_nprim, int max_l,
-                                int deriv = 0);
+                                int deriv = 0,
+                                libint2::BraKet braket = libint2::BraKet::invalid);
 
 /// (s1 s2|g|s3 s4) into e.results() with precomputed shell-pair data (may be null),
 /// dispatched on the operator kind (unscaled)

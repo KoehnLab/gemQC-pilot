@@ -3,6 +3,7 @@
 #include <libint2/config.h>
 
 #include <algorithm>
+#include <cstdlib>
 #include <stdexcept>
 
 #include "gemqc/elements.h"
@@ -23,11 +24,29 @@ AtomBasis per_atom(const Molecule& mol, const ElementBasis& basis, const std::st
 }
 }  // namespace
 
-BasisSet::BasisSet(const Molecule& mol, const ElementBasis& basis, std::string name)
-    : BasisSet(mol, per_atom(mol, basis, name), name) {}
+int max_l_auxiliary() {
+  // 2- and 3-centre ERI limits of the libint build (first entry: no derivatives)
+#ifdef LIBINT_ERI3_MAX_AM
+  const int l3 = LIBINT_ERI3_MAX_AM;
+#else
+  const int l3 = std::atoi(LIBINT_ERI3_MAX_AM_LIST);
+#endif
+#ifdef LIBINT_ERI2_MAX_AM
+  const int l2 = LIBINT_ERI2_MAX_AM;
+#else
+  const int l2 = std::atoi(LIBINT_ERI2_MAX_AM_LIST);
+#endif
+  return std::max({LIBINT_MAX_AM, std::min(l2, l3)});
+}
 
-BasisSet::BasisSet(const Molecule& mol, const AtomBasis& basis, std::string name)
+BasisSet::BasisSet(const Molecule& mol, const ElementBasis& basis, std::string name,
+                   bool auxiliary)
+    : BasisSet(mol, per_atom(mol, basis, name), name, auxiliary) {}
+
+BasisSet::BasisSet(const Molecule& mol, const AtomBasis& basis, std::string name,
+                   bool auxiliary)
     : name_(std::move(name)) {
+  const int lmax = auxiliary ? max_l_auxiliary() : LIBINT_MAX_AM;
   if (basis.size() != mol.natoms())
     throw std::invalid_argument("basis '" + name_ + "': shells for " +
                                 std::to_string(basis.size()) + " atoms, molecule has " +
@@ -35,10 +54,10 @@ BasisSet::BasisSet(const Molecule& mol, const AtomBasis& basis, std::string name
   for (size_t ia = 0; ia < mol.natoms(); ++ia) {
     const auto& atom = mol.atom(ia);
     for (const auto& sd : basis[ia]) {
-      if (sd.l > LIBINT_MAX_AM)
+      if (sd.l > lmax)
         throw std::invalid_argument(
-            "angular momentum l=" + std::to_string(sd.l) +
-            " exceeds libint limit " + std::to_string(LIBINT_MAX_AM));
+            "angular momentum l=" + std::to_string(sd.l) + " exceeds libint limit " +
+            std::to_string(lmax) + (auxiliary ? " (fitting basis)" : ""));
       if (sd.exponents.size() != sd.coefficients.size() || sd.exponents.empty())
         throw std::invalid_argument("inconsistent shell definition");
       // libint normalizes the contraction (embeds primitive norms)

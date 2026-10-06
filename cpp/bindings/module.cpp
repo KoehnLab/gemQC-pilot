@@ -82,10 +82,13 @@ PYBIND11_MODULE(_core, m) {
       .def_readwrite("coefficients", &ShellDef::coefficients);
 
   py::class_<BasisSet>(m, "BasisSet", "atom-centred basis set (libint shells)")
-      .def(py::init<const Molecule&, const ElementBasis&, std::string>(),
-           py::arg("molecule"), py::arg("element_basis"), py::arg("name") = "")
-      .def(py::init<const Molecule&, const AtomBasis&, std::string>(),
+      .def(py::init<const Molecule&, const ElementBasis&, std::string, bool>(),
+           py::arg("molecule"), py::arg("element_basis"), py::arg("name") = "",
+           py::arg("auxiliary") = false,
+           "auxiliary: fitting basis (2-/3-centre integrals only; higher l allowed)")
+      .def(py::init<const Molecule&, const AtomBasis&, std::string, bool>(),
            py::arg("molecule"), py::arg("atom_basis"), py::arg("name") = "",
+           py::arg("auxiliary") = false,
            "shells per atom (list over the atoms of the molecule)")
       .def("set_centers", &BasisSet::set_centers, py::arg("molecule"))
       .def_property_readonly("name", &BasisSet::name)

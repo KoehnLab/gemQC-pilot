@@ -22,7 +22,10 @@ auxiliary and CABS basis sets and the pair integrals need higher angular momenta
 the F12XG pilot uses the kernel `delcgtga_delcgtgb` of the custom build): use a custom
 libint build (see [libint build](developer/libint_build.md); gemQC-pilot is tested
 with a build for angular momentum 7). Without it, calculations with l above the
-limit stop with an error or abort.
+limit stop with an error or abort. Orbital and CABS basis sets are limited to the
+maximum angular momentum of the build (7), fitting (auxiliary) basis sets, which enter
+2- and 3-centre integrals only, to that of libint's 2-/3-centre ERIs (8 in the custom
+build; both limits are printed at the start of the output).
 
 On Linux, build libint yourself. Since it is linked into a Python extension module, a
 static libint must be compiled position-independent:

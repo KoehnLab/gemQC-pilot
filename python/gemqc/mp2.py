@@ -104,7 +104,7 @@ def rc_builder(system, options, out):
     if system.df_c is None:
         try:
             name, how = aux_basis_name(system, "c", options, system.c_used)
-            aux = build_basis(system.molecule, name)
+            aux = build_basis(system.molecule, name, auxiliary=True)
         except (ValueError, FileNotFoundError) as e:
             raise InputError(f"system '{system.name}': density fitting (correlation): {e}") from None
         from types import SimpleNamespace

@@ -428,7 +428,7 @@ def jk_builder(system, options, out):
     if df is None:
         try:
             name, how = aux_basis_name(system, "jk", options, None)
-            aux = build_basis(system.molecule, name)
+            aux = build_basis(system.molecule, name, auxiliary=True)
         except (ValueError, FileNotFoundError) as e:
             raise InputError(f"system '{system.name}': density fitting: {e}") from None
         system.df = None  # release the old builder first
@@ -890,7 +890,7 @@ def _run(input_path, out, memory, threads, write_files, archive=None):
     out()
     out.value("git revision", git_revision())
     out(f"  libint {li['version_major']}.{li['version_minor']}.{li['version_micro']}"
-        f" (max l = {li['max_am']})")
+        f" (max l = {li['max_am']}, fitting basis {li['max_am_auxiliary']})")
     spec = parse_input(input_path)
     resolved = []
     for t in spec.tasks:

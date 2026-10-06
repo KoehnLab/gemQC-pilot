@@ -66,18 +66,20 @@ void check_gtg(const std::vector<std::pair<double, double>>& gtg) {
 }  // namespace
 
 libint2::Engine two_body_engine(const TwoBodyOperator& op, size_t max_nprim, int max_l,
-                                int deriv) {
+                                int deriv, BraKet braket) {
   init_libint();
   const double eps = std::numeric_limits<double>::epsilon();
   using K = TwoBodyOperator::Kind;
   if (op.kind == K::coulomb)
-    return libint2::Engine(Operator::coulomb, max_nprim, max_l, deriv, eps);
+    return libint2::Engine(Operator::coulomb, max_nprim, max_l, deriv, eps,
+                           {}, braket);
   if (op.kind == K::delcgtga_delcgtgb) {
 #ifdef GEMQC_HAVE_DELCGTGAB
     check_gtg(op.gtg);
     check_gtg(op.gtg2);
     return libint2::Engine(Operator::delcgtga_delcgtgb, max_nprim, max_l, deriv, eps,
-                           std::array<libint2::ContractedGaussianGeminal, 2>{op.gtg, op.gtg2});
+                           std::array<libint2::ContractedGaussianGeminal, 2>{op.gtg, op.gtg2},
+                           braket);
 #else
     throw std::runtime_error("operator delcgtga_delcgtgb needs a libint with this kernel "
                              "(custom build, docs/developer/libint_build.md)");
@@ -89,13 +91,13 @@ libint2::Engine two_body_engine(const TwoBodyOperator& op, size_t max_nprim, int
                       : op.kind == K::cgtg_x_coulomb ? Operator::cgtg_x_coulomb
                                                      : Operator::delcgtg2;
     return libint2::Engine(oper, max_nprim, max_l, deriv, eps,
-                           libint2::ContractedGaussianGeminal(op.gtg));
+                           libint2::ContractedGaussianGeminal(op.gtg), braket);
   }
   // libint's Slater/Yukawa core integrals fail (crash) for tiny exponents
   if (!(op.zeta >= 1e-3))
     throw std::invalid_argument("Slater-type operator needs zeta >= 1e-3");
   const auto oper = op.kind == K::stg ? Operator::stg : Operator::stg_x_coulomb;
-  return libint2::Engine(oper, max_nprim, max_l, deriv, eps, op.zeta);
+  return libint2::Engine(oper, max_nprim, max_l, deriv, eps, op.zeta, braket);
 }
 
 void compute_quartet(libint2::Engine& e, const TwoBodyOperator& op, const libint2::Shell& s1,
@@ -157,7 +159,7 @@ std::vector<libint2::Engine> engines(const TwoBodyOperator& op,
     nprim = std::max(nprim, b->max_nprim());
     l = std::max(l, b->max_l());
   }
-  std::vector<libint2::Engine> e(threads(), two_body_engine(op, nprim, l));
+  std::vector<libint2::Engine> e(threads(), two_body_engine(op, nprim, l, 0, bk));
   for (auto& x : e) x.set(bk);
   return e;
 }

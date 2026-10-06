@@ -262,9 +262,10 @@ def atom_shells(name, zs):
     return out
 
 
-def build_basis(mol, spec, labels=None) -> BasisSet:
+def build_basis(mol, spec, labels=None, auxiliary=False) -> BasisSet:
     """Basis set on the atoms of `mol`: a name, a canonical name or a mapping per
-    element/atom (see assign_basis); BasisSet.name is the canonical name.
+    element/atom (see assign_basis); BasisSet.name is the canonical name. auxiliary:
+    fitting basis (functions up to the 2-/3-centre limit of libint, l = 8 in the custom build).
 
     Raises:
         ValueError: Invalid assignment, missing elements, or ECPs (not supported).
@@ -278,8 +279,8 @@ def build_basis(mol, spec, labels=None) -> BasisSet:
             raise ValueError(f"basis '{b}' uses ECPs for {syms}; ECPs are not supported yet")
     name = canonical_name(names, zs)
     if len(set(names)) == 1:
-        return BasisSet(mol, load_basis(name), name)
-    return BasisSet(mol, atom_shells(name, zs), name)
+        return BasisSet(mol, load_basis(name), name, auxiliary)
+    return BasisSet(mol, atom_shells(name, zs), name, auxiliary)
 
 
 def contraction_pattern(shells) -> str:

@@ -26,12 +26,18 @@ using ElementBasis = std::map<int, std::vector<ShellDef>>;
 /// shell definitions per atom (index: atom of the molecule)
 using AtomBasis = std::vector<std::vector<ShellDef>>;
 
+/// highest angular momentum of fitting functions (2- and 3-centre ERIs of libint; may
+/// exceed the limit of the orbital basis sets, LIBINT_MAX_AM)
+int max_l_auxiliary();
+
+/// auxiliary: fitting basis (only used in 2- and 3-centre integrals, higher l allowed)
 class BasisSet {
  public:
-  BasisSet(const Molecule& mol, const ElementBasis& basis,
-           std::string name = "");
+  BasisSet(const Molecule& mol, const ElementBasis& basis, std::string name = "",
+           bool auxiliary = false);
   /// shells per atom (e.g. different basis sets for atoms of one element)
-  BasisSet(const Molecule& mol, const AtomBasis& basis, std::string name = "");
+  BasisSet(const Molecule& mol, const AtomBasis& basis, std::string name = "",
+           bool auxiliary = false);
 
   /// move shells to the current atom positions of mol (same atom list!)
   void set_centers(const Molecule& mol);

@@ -182,6 +182,35 @@ def test_high_angular_momentum(kind, zeta):
         assert np.abs(V2[iP, ns] - ref).max() < 1e-11 * max(1.0, np.abs(ref).max())
 
 
+@pytest.mark.parametrize("kind,zeta", OPS)
+def test_auxiliary_l8(kind, zeta):
+    """Fitting functions up to l = 8 (2-/3-centre integrals of the custom libint):
+    (P|g|ss) and (P|g|s) by quadrature; orbital shells are limited to l = 7."""
+    A, Q = np.zeros(3), np.array([0.4, -0.7, 1.1])
+    q = 0.9
+    mol = _core.Molecule()
+    mol.add_atom(1, A)
+    mol.add_atom(2, Q)
+    aux = _core.BasisSet(mol, {1: [_core.ShellDef(8, True, [1.1], [1.0]),
+                                   _core.ShellDef(5, True, [0.7], [1.0])], 2: []}, "aux", True)
+    bs = _core.BasisSet(mol, {1: [], 2: [_core.ShellDef(0, True, [q], [1.0])]})
+    assert aux.max_l == 8
+    with pytest.raises(ValueError, match="exceeds libint limit"):
+        _core.BasisSet(mol, {1: [_core.ShellDef(8, True, [1.1], [1.0])], 2: []})
+    op = _core.TwoBodyOperator(kind, zeta, 1.0)
+    pts, w = _grid(A)
+    chi = _core.basis_values(aux, pts)
+    r = np.linalg.norm(pts - Q, axis=1)
+    phi_pair = _norm(q) ** 2 * potential(kind, zeta, 2 * q, r)
+    phi_one = _norm(q) * potential(kind, zeta, q, r)
+    V3 = np.asarray(_core.two_body_3c(op, aux, bs)).reshape(aux.nbf, 1, 1)
+    V2 = np.asarray(_core.two_body_2c(op, aux, bs))
+    ref3 = np.einsum("p,pa->a", w * phi_pair, chi)
+    ref2 = np.einsum("p,pa->a", w * phi_one, chi)
+    assert np.abs(V3[:, 0, 0] - ref3).max() < 1e-11 * max(1.0, np.abs(ref3).max())
+    assert np.abs(V2[:, 0] - ref2).max() < 1e-11 * max(1.0, np.abs(ref2).max())
+
+
 # --- relations between operators ----------------------------------------------------------
 
 def _mixed():

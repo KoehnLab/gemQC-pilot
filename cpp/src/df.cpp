@@ -38,9 +38,8 @@ int thread_id() {
 
 libint2::Engine engine(BraKet bk, size_t nprim, int l, double precision) {
   init_libint();
-  libint2::Engine e(Operator::coulomb, nprim, l, 0);
-  e.set(bk);
-  e.set_precision(precision);
+  libint2::Engine e(Operator::coulomb, nprim, l, 0, precision, {}, bk);  // l up to the
+  e.set(bk);                                                             // 2-/3-centre limit
   return e;
 }
 
