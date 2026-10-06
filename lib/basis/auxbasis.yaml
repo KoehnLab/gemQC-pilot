@@ -1,0 +1,41 @@
+# Default auxiliary basis sets for orbital basis sets.
+#
+# Lookup for an orbital basis B (python/gemqc/basislib.py: jk_auxbasis, c_auxbasis,
+# cabs_auxbasis): the system key `jk_auxbasis` / `c_auxbasis` / `cabs_auxbasis` if given
+# (task options and the choice of an earlier task come first, see driver.aux_basis_name);
+# else an exact entry for B in the section jk / c / cabs below (case-insensitive); else a
+# file "<B>-JK" / "<B>-C" / "<B>-CABS" in the basis directory; for core-valence sets
+# p(w)CVXZ the default of pVXZ (e.g. aug-cc-pwCVTZ -> aug-cc-pVTZ-JK), also for H and He
+# if the fitting basis lacks them (cc-pCVTZ-F12-C -> aug-cc-pwCVTZ-C); else the first
+# matching pattern of the section (shell-style wildcards, in the given order). Extend as needed; a
+# file of the same name in $GEMQC_DIR/lib/basis takes precedence.
+
+# JK fitting: (aug-)cc-pVXZ-JK files are found automatically for X = T, Q, 5; DZ uses the TZ
+# set. aug-cc-pVXZ-JK are generated from cc-pVXZ-JK (augment_jk.py, = Molpro AVXZ/JKFIT).
+jk:
+  def2-SVP: def2-universal-JK
+  def2-TZVP: def2-universal-JK
+  def2-TZVPP: def2-universal-JK
+  def2-QZVP: def2-universal-JK
+  def2-QZVPP: def2-universal-JK
+  cc-pVDZ: cc-pVTZ-JK
+  aug-cc-pVDZ: aug-cc-pVTZ-JK
+  cc-pVDZ-F12: cc-pVTZ-JK      # cc-pVXZ-F12: cc-pV(X+1)Z-JK (cc-pCVXZ-F12 as for cc-pVXZ-F12)
+  cc-pVTZ-F12: cc-pVQZ-JK
+  cc-pVQZ-F12: cc-pV5Z-JK
+  "def2-*": def2-universal-JK
+  "cc-pV*Z": def2-universal-JK
+  "aug-cc-pV*Z": def2-universal-JK
+
+# correlation (RI, "-C") fitting basis sets, e.g. for df-mp2 (files <B>-C are found
+# automatically: def2-SVP-C, def2-TZVPP-C, cc-pVTZ-C, cc-pVQZ-C, aug-cc-pVXZ-C,
+# aug-cc-pwCVXZ-C; DZ, QZ, 5Z of the latter converted from the Molpro library)
+c:
+  def2-TZVP: def2-TZVPP-C
+  cc-pVDZ-F12: aug-cc-pwCVDZ-C   # cc-pVXZ-F12: aug-cc-pwCVXZ-C (cc-pCVXZ-F12: own -C files,
+  cc-pVTZ-F12: aug-cc-pwCVTZ-C   # H and He from aug-cc-pwCVXZ-C)
+  cc-pVQZ-F12: aug-cc-pwCVQZ-C
+
+# complementary auxiliary basis sets of F12 methods (files <B>-CABS are found
+# automatically: aug-cc-pVXZ-CABS = OptRI, cc-p(C)VXZ-F12-CABS)
+cabs: {}

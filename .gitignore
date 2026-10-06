@@ -1,0 +1,11 @@
+build/
+__pycache__/
+*.so
+*.egg-info/
+.pytest_cache/
+TODO.md
+.venv/
+reference_*
+sandbox*
+.claude/
+tmp_*
