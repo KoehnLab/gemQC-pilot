@@ -49,11 +49,15 @@ for a single exponent) and equal Molpro's AVXZ/JKFIT; see corresponding file hea
 cc-pVXZ-JK sets of Ne, Ar and Kr are missing on the Basis Set Exchange; they are taken
 from Molpro's library (extrapolated sets, noted in the element references).
 
-aug-cc-pwCVTZ for Br is not on the Basis Set Exchange either: it consists of
-aug-cc-pVTZ and the core-valence functions 2s2p2d2f1g (uncontracted) of N.J. DeYonker,
-K.A. Peterson, A.K. Wilson, J. Phys. Chem. A 111, 11383 (2007), taken from
+aug-cc-pwCVXZ (X = T, Q, 5) for Br are not on the Basis Set Exchange either: they consist
+of aug-cc-pVXZ and the core-valence functions (uncontracted; T: 2s2p2d2f1g, Q:
+3s3p3d3f2g1h, 5: 4s4d4f3g2h1i) of N.J. DeYonker, K.A. Peterson, A.K. Wilson, J. Phys.
+Chem. A 111, 11383 (2007), taken from
 <http://tyr0.chem.wsu.edu/~kipeters/basissets/CV3dbasis.html> (noted in the element
-references). There is no matching correlation fitting basis (aug-cc-pwCVTZ-C lacks Br).
+references). For 5Z the p set of cc-pV5Z is recontracted (17p)/[10p] instead (the 2p and
+3p contractions and the 8 most diffuse primitives uncontracted, the 4p contraction
+omitted), plus the diffuse p of aug-cc-pV5Z. There is no matching correlation fitting
+basis (aug-cc-pwCVXZ-C lack Br).
 
 ## SAD guess
 
