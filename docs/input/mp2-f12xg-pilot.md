@@ -43,7 +43,7 @@ tasks:
   - the **core orbital functions**: $\langle r_A^2\rangle$ of the normalized function about
     its own atom below `core_valence_threshold` (default 1.05) times the HF
     $\langle r^2\rangle$ of the outermost core shell of the element (1s for Li–Ne, 2s/2p
-    for Na–Ar; H and He have no core);
+    for Na–Ar, 3s/3p/3d for Ga–Kr; H and He have no core);
   - the **core-correlating functions**: all shells of the orbital basis that are not in
     the valence reference basis, derived per atom from the name (`cc-pCVXZ`,
     `cc-pwCVXZ` → `cc-pVXZ`; also for a [basis per atom](index.md)) or given as
@@ -53,8 +53,8 @@ tasks:
   Group 2 holds all other functions. The radial criterion alone cannot identify the
   core-correlating functions: they lie in the same range of $\langle r^2\rangle$ as
   compact valence functions (C in cc-pCVDZ-F12: extra p at 3.2 times the 1s value, the
-  inner 2p function of cc-pVDZ-F12 at 2.8). Elements beyond Ar have no core reference
-  yet; use the atoms or functions form there.
+  inner 2p function of cc-pVDZ-F12 at 2.8). K–Zn and elements beyond Kr have no
+  core reference yet; use the atoms or functions form there.
 - `{atoms: [...]}`: group 1 = the listed atoms (1-based numbers or element symbols),
   group 2 = all others.
 - `{functions: [...]}`: group 1 or 2 for each basis function (AO order of the output).

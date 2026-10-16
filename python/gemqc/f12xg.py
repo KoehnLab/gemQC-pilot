@@ -27,11 +27,13 @@ import numpy as np
 
 from . import _core
 
-#: HF <r^2> (bohr^2) of the outermost core shell (Li-Ne: 1s, Na-Ar: max of 2s, 2p), from
-#: the HF-contracted core functions of cc-pVQZ
+#: HF <r^2> (bohr^2) of the outermost core shell (Li-Ne: 1s, Na-Ar: max of 2s, 2p,
+#: Ga-Kr: max of 3s, 3p, 3d = 3d), from the HF-contracted core functions of cc-pVQZ
+#: (Li-Ar) or atomic ROHF in cc-pVQZ (Ga-Kr; reproduces the Li-Ar values)
 CORE_R2 = {3: 0.4468, 4: 0.2330, 5: 0.1434, 6: 0.0972, 7: 0.0703, 8: 0.0531, 9: 0.0416,
            10: 0.0335, 11: 0.8222, 12: 0.5977, 13: 0.4589, 14: 0.3773, 15: 0.3159,
-           16: 0.2685, 17: 0.2312, 18: 0.2012}
+           16: 0.2685, 17: 0.2312, 18: 0.2012,
+           31: 0.7962, 32: 0.6571, 33: 0.5566, 34: 0.4800, 35: 0.4199, 36: 0.3715}
 
 #: default of core_valence_threshold (ratio <r_A^2> / r2_core of the core orbital functions)
 CORE_VALENCE_THRESHOLD = 1.05
@@ -41,7 +43,7 @@ def check_core_reference(z):
     """Raise if element z has a core but no entry in CORE_R2."""
     if z > 2 and z not in CORE_R2:
         raise ValueError(f"core_valence: no core reference for {_core.element_symbol(z)} "
-                         "(H-Ar so far); give bf_groups by atoms or functions")
+                         "(H-Ar, Ga-Kr so far); give bf_groups by atoms or functions")
 
 
 def valence_reference_name(name, zs):
