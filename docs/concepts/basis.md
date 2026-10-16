@@ -49,6 +49,12 @@ for a single exponent) and equal Molpro's AVXZ/JKFIT; see corresponding file hea
 cc-pVXZ-JK sets of Ne, Ar and Kr are missing on the Basis Set Exchange; they are taken
 from Molpro's library (extrapolated sets, noted in the element references).
 
+aug-cc-pwCVTZ for Br is not on the Basis Set Exchange either: it consists of
+aug-cc-pVTZ and the core-valence functions 2s2p2d2f1g (uncontracted) of N.J. DeYonker,
+K.A. Peterson, A.K. Wilson, J. Phys. Chem. A 111, 11383 (2007), taken from
+<http://tyr0.chem.wsu.edu/~kipeters/basissets/CV3dbasis.html> (noted in the element
+references). There is no matching correlation fitting basis (aug-cc-pwCVTZ-C lacks Br).
+
 ## SAD guess
 
 The superposition of atomic densities uses neutral atoms in their ground
