@@ -256,7 +256,8 @@ class ExactF12XGIntegrals:
         FG = <mn|g_kl/r12>                        (f_GH/r12)
         U  = <g_mn|grad_1 . grad_1|g_kl>          ((grad f_G'H') . (grad f_GH))
         F2 = <g_mn|g_kl>                          (f_G'H' f_GH)
-        H1 = <(hJ m^G') n^H'|f_G'H' f_GH|k^G l^H> (hJ = h + 2J on electron 1 via the RI)
+        H1 = w <(hJ m^G') n^H'|f_G'H' f_GH|k^G l^H> (hJ = h + 2J on electron 1 via the RI;
+                                                   w: kinetic_weight(G'H', GH))
 
     Args:
         ri: cabs.RISpace.
@@ -358,12 +359,13 @@ class ExactF12XGIntegrals:
                     for G1, H1 in masks:
                         self.U[k, l] += Cx[:, G1 * na:(G1 + 1) * na].T @ K @ \
                             Cx[:, H1 * na:(H1 + 1) * na]
+                w = kinetic_weight(geminal, Tb, T)
                 for (k, l), _, K in run(prod["f12 x f12"], bri, bo, ordered, T,
                                         bri.nbf * bo.nbf * DOUBLE):
                     for G1, H1 in masks:
                         Kn = K @ Cx[:, H1 * na:(H1 + 1) * na]
                         self.F2[k, l] += Cx_ri[:, G1 * na:(G1 + 1) * na].T @ Kn
-                        self.H1[k, l] += Hx_ri[:, G1 * na:(G1 + 1) * na].T @ Kn
+                        self.H1[k, l] += w * (Hx_ri[:, G1 * na:(G1 + 1) * na].T @ Kn)
         self.time = time.time() - t0
 
     def pair(self, i, j):
@@ -477,7 +479,8 @@ class DFF12XGIntegrals:
             for G, H in {T, T[::-1]}:
                 self.FG += ein(dm[G], Gt[H]) + ein(Gt[G], dm[H])
         # U, F2, H1 [k, l, m, n] = sum <m^G' n^H'| op(T', T) |k^G l^H>, op symmetric in
-        # T', T: densities (k^G m^G') and (l^H n^H'), H1 with hJ m^G'
+        # T', T: densities (k^G m^G') and (l^H n^H'), H1 with hJ m^G' (weighted, see
+        # kinetic_weight)
         self.U, self.F2, self.H1 = (np.zeros((na,) * 4) for _ in range(3))
         done = set()
         for Tb in geminal.pairs:
@@ -499,12 +502,13 @@ class DFF12XGIntegrals:
                       for G in self.groups for G1 in self.groups}
                 # all (ket T, bra T') assignments of this operator
                 for Tk, Tbra in {(Tb, T), (T, Tb)}:
+                    w = kinetic_weight(geminal, Tbra, Tk)
                     for G, H in {Tk, Tk[::-1]}:
                         for G1, H1 in {Tbra, Tbra[::-1]}:
                             a, b = (G, G1), (H, H1)
                             self.U += ein(dmm[a], Gt["U"][b]) + ein(Gt["U"][a], dmm[b])
                             self.F2 += ein(dmm[a], Gt["F2"][b]) + ein(Gt["F2"][a], dmm[b])
-                            self.H1 += ein(dmh[a], Gt["F2"][b]) + ein(Gh[a], dmm[b])
+                            self.H1 += w * (ein(dmh[a], Gt["F2"][b]) + ein(Gh[a], dmm[b]))
         self.time = time.time() - t0
 
     def pair(self, i, j):
@@ -523,6 +527,23 @@ class DFF12XGIntegrals:
 
     def close(self):
         self.store.close()
+
+
+def kinetic_weight(geminal, bra, ket):
+    """Weight of the [F^2 bar] term with hJ on the bra orbitals (geminal f_a of the group
+    pair bra) and the ket geminal f_b (group pair ket): 2 g_b / (g_a + g_b).
+
+    Approximation C writes f_a T f_b as 1/2 [f_a, [T, f_b]] (U) plus F^2 terms with T on
+    the orbitals. For f_a != f_b the symmetric form 1/2 (f_a f_b T + T f_a f_b) misses
+    1/2 (f_a T f_b - f_b T f_a); for Slater functions f = -exp(-g r12)/g it is
+    f_a grad f_b - f_b grad f_a = (1/g_b - 1/g_a) grad (f_a f_b g_a g_b / (g_a + g_b)), so
+    f_a T f_b = U + (g_b f_a f_b T + g_a T f_a f_b) / (g_a + g_b) (T acting to the right,
+    resp. on the bra); the local h - T and J cancel in the antisymmetric part, so hJ
+    replaces T. B = 1/2 (A + A^T) then needs the weight 2 g_b / (g_a + g_b) on the term
+    with hJ on the bra (1 for equal geminals). Fitted geminals use their nominal gamma.
+    """
+    ga, gb = geminal.geminal(*bra).gamma, geminal.geminal(*ket).gamma
+    return 2.0 * gb / (ga + gb)
 
 
 def _fname(T, G):

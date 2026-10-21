@@ -241,7 +241,7 @@ def test_equal_gammas_pair_intermediates(fit, quiet):
 def test_xg_pair_integrals_brute_force(quiet):
     """Distinct gt: F, G and the arrays FG, U, F2, H1 against the full AO tensors of the RI
     basis, assembled with the masked orbitals and one operator per group pair."""
-    from gemqc.f12xg import ExactF12XGIntegrals
+    from gemqc.f12xg import ExactF12XGIntegrals, kinetic_weight
     a, ri, groups = _he2_groups()
     gem = XGGeminal([0.7, 1.9], 6)
     ints = ExactF12XGIntegrals(ri, 0, 2, gem, groups, 1e-14)
@@ -280,8 +280,8 @@ def test_xg_pair_integrals_brute_force(quiet):
             X = v4(prod["f12 x f12"])
             F2 += np.einsum("abcd,am,bk,cn,dl->klmn", X, M[G1], M[G], M[H1_], M[H_],
                             optimize=True)
-            H1 += np.einsum("abcd,am,bk,cn,dl->klmn", X, H[G1], M[G], M[H1_], M[H_],
-                            optimize=True)
+            H1 += kinetic_weight(gem, T(G1, H1_), T(G, H_)) * np.einsum(
+                "abcd,am,bk,cn,dl->klmn", X, H[G1], M[G], M[H1_], M[H_], optimize=True)
     Gref = np.einsum("abcd,ai,bP,cj,dQ->ijPQ", v4(_core.TwoBodyOperator("coulomb")), Ca, C,
                      Ca, C, optimize=True)
     nmo = ri.nmo
@@ -301,6 +301,30 @@ def test_xg_pair_integrals_brute_force(quiet):
         assert np.abs(std.pair(1, 0)["F"] - ints.pair(1, 0)["F"]).max() > 1e-3
         std.close()
     ints.close()
+
+
+def test_kinetic_weight_identity():
+    """f_a T f_b = U + (g_b f_a f_b T + g_a T f_a f_b) / (g_a + g_b) for Slater factors
+    (1D model, numerical derivatives); the symmetric form fails for g_a != g_b."""
+    from gemqc.f12xg import kinetic_weight
+    x = np.linspace(0.0, 30.0, 300001)
+    dx = x[1] - x[0]
+    d = lambda y: np.gradient(y, dx)  # noqa: E731
+    kin = lambda y: -0.5 * d(d(y))  # noqa: E731
+    integ = lambda y: np.sum(0.5 * (y[1:] + y[:-1])) * dx  # noqa: E731
+    ga, gb = 3.0, 0.9
+    fa, fb = -np.exp(-ga * x) / ga, -np.exp(-gb * x) / gb
+    pa = x ** 2 * np.exp(-1.3 * x) * (1 - 0.4 * x)
+    pb = x ** 3 * np.exp(-0.8 * x)
+    exact = integ(fa * pa * kin(fb * pb))
+    U = 0.5 * integ(pa * pb * d(fa) * d(fb))
+    S_bra, S_ket = integ(kin(pa) * fa * fb * pb), integ(pa * fa * fb * kin(pb))
+    gem = XGGeminal([ga, gb], "exact")
+    wa, wb = kinetic_weight(gem, (0, 0), (1, 1)), kinetic_weight(gem, (1, 1), (0, 0))
+    assert abs(wa + wb - 2.0) < 1e-14
+    assert abs(U + 0.5 * (wa * S_bra + wb * S_ket) - exact) < 1e-8 * abs(exact)
+    assert abs(U + 0.5 * (S_bra + S_ket) - exact) > 1e-1 * abs(exact)
+    assert kinetic_weight(gem, (0, 1), (0, 1)) == 1.0
 
 
 # --- task mp2-f12xg-pilot ---------------------------------------------------------------

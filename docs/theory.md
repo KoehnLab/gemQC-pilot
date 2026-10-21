@@ -147,8 +147,26 @@ sum over group pairs of standard integrals with one operator and masked orbitals
   group $G'$ (the five-index structure of the integrals).
 
 Approximation C does not use $f\phi_i = \varepsilon_i\phi_i$ for the geminal orbitals, so
-the masked (non-canonical) orbitals need no other change. Since $f'_{GH}(0) = 1$ for
+the masked (non-canonical) orbitals need no other change there. Since $f'_{GH}(0) = 1$ for
 every pair, the fixed amplitudes still satisfy the cusp conditions.
+
+Kinetic term with different bra and ket geminals $f_a = f_{G'H'}$, $f_b = f_{GH}$: the
+rewriting $f T f = \frac12[f,[T,f]] + \frac12(f^2 T + T f^2)$ gives for $f_a \ne f_b$ only
+the symmetric part $\frac12(f_a T f_b + f_b T f_a)$; the remainder $\frac12(f_a T f_b -
+f_b T f_a)$ does not cancel in the sum over the group pairs when an orbital has components
+in both groups. For Slater functions, $f_a\nabla f_b - f_b\nabla f_a = (1/\gamma_b -
+1/\gamma_a)\,\nabla\big(\gamma_a\gamma_b f_a f_b/(\gamma_a+\gamma_b)\big)$, hence
+
+$$
+f_a T f_b = \tfrac12[f_a,[T,f_b]] + \frac{\gamma_b\, f_a f_b T + \gamma_a\, T f_a f_b}
+{\gamma_a + \gamma_b},
+$$
+
+with $T$ acting to the right or on the bra. The local parts of $h + J$ cancel in the
+antisymmetric remainder, so in $[\bar{F^2}]$ the term with $h + J$ on the bra orbitals
+(geminal $f_a$) carries the weight $2\gamma_b/(\gamma_a+\gamma_b)$ before the
+symmetrization $\hat S$ (1 for equal geminals; nominal exponents for fitted geminals,
+for which the relation holds to the accuracy of the fit).
 
 With density fitting, each group-pair term has a fixed operator, so the robust formula
 applies term by term with the fit coefficients of the masked densities,
