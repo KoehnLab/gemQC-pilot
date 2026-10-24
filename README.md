@@ -6,9 +6,9 @@ AI agent-based approach.
 **gemQC-pilot** implements SCF, MP2, MP2-F12 and a pilot version of MP2-F12XG
 (`mp2-f12xg-pilot`), as a demonstrator of the F12XG methods.
 
-It's quantum chemistry code for exploring new methods and algorithms: C++ backend
+It is a quantum chemistry code for exploring new methods and algorithms: It features a C++ backend
 (integrals with [libint](https://github.com/evaleev/libint), Eigen, OpenMP) for the
-heavy computations, Python frontend for driving calculations and pilot coding. The basis
+heavy computations and a Python frontend for driving calculations and pilot coding. The basis
 set library is taken from the [Basis Set Exchange](https://www.basissetexchange.org).
 Please cite libint and the Basis Set Exchange, together with the methods used (see
 [References](#references)).
@@ -142,7 +142,6 @@ The closed-shell methods are based on the following works.
 - M. Häser, R. Ahlrichs, J. Comput. Chem. **10**, 104 (1989), [doi:10.1002/jcc.540100111](https://doi.org/10.1002/jcc.540100111) (integral screening, incremental Fock build)
 - M. Dupuis, H. F. King, Int. J. Quantum Chem. **11**, 613 (1977), [doi:10.1002/qua.560110408](https://doi.org/10.1002/qua.560110408) (skeleton Fock matrix)
 - J. H. Van Lenthe, R. Zwaans, H. J. J. Van Dam, M. F. Guest, J. Comput. Chem. **27**, 926 (2006), [doi:10.1002/jcc.20393](https://doi.org/10.1002/jcc.20393) (SAD guess)
-- J. P. Zobel, P.-O. Widmark, V. Veryazov, J. Chem. Theory Comput. **16**, 278 (2020), [doi:10.1021/acs.jctc.9b00873](https://doi.org/10.1021/acs.jctc.9b00873); correction **17**, 3233 (2021), [doi:10.1021/acs.jctc.1c00329](https://doi.org/10.1021/acs.jctc.1c00329) (ANO-R0 basis of the SAD guess)
 
 **Density fitting**
 
@@ -167,6 +166,7 @@ The closed-shell methods are based on the following works.
 - E. F. Valeev, Chem. Phys. Lett. **395**, 190 (2004), [doi:10.1016/j.cplett.2004.07.061](https://doi.org/10.1016/j.cplett.2004.07.061) (CABS)
 - S. Ten-no, Chem. Phys. Lett. **398**, 56 (2004), [doi:10.1016/j.cplett.2004.09.041](https://doi.org/10.1016/j.cplett.2004.09.041) (Slater-type geminal)
 - S. Ten-no, J. Chem. Phys. **121**, 117 (2004), [doi:10.1063/1.1757439](https://doi.org/10.1063/1.1757439) (fixed amplitudes)
+- D. P. Tew, W. Klopper, J. Chem. Phys. **123**, 074101 (2005) [doi:10.1063/1.1999632](https://doi.org/10.1063/1.1999632) (STG-nG fit)
 - F. R. Manby, J. Chem. Phys. **119**, 4607 (2003), [doi:10.1063/1.1594713](https://doi.org/10.1063/1.1594713) (density fitting of the F12 integrals)
 - B. I. Dunlap, J. Mol. Struct. (THEOCHEM) **529**, 37 (2000), [doi:10.1016/s0166-1280(00)00528-5](https://doi.org/10.1016/s0166-1280(00)00528-5) (robust fitting)
 - S. Kedžuch, M. Milko, J. Noga, Int. J. Quantum Chem. **105**, 929 (2005), [doi:10.1002/qua.20744](https://doi.org/10.1002/qua.20744) (approximation C)
