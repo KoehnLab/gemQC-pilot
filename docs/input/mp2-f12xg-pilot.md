@@ -48,7 +48,11 @@ tasks:
     the valence reference basis, derived per atom from the name (`cc-pCVXZ`,
     `cc-pwCVXZ` → `cc-pVXZ`; also for a [basis per atom](index.md)) or given as
     `{core_valence: <valence basis>}`. If the derived basis is not
-    available, only the first criterion is used (noted in the output).
+    available, only the first criterion is used (noted in the output). Functions of the
+    valence basis that the orbital basis recontracts are accepted if they lie in the span
+    of the orbital basis on their atom (aug-cc-pwCV5Z of Br: the 4p contraction of
+    cc-pV5Z is dropped and 4 more p primitives are uncontracted, which are then the
+    core-correlating p functions).
 
   Group 2 holds all other functions. The radial criterion alone cannot identify the
   core-correlating functions: they lie in the same range of $\langle r^2\rangle$ as

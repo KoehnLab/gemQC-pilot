@@ -192,7 +192,8 @@ def test_core_valence_cv_basis():
     mol = _mol([(3, [0.0, 0.0, 0.0]), (6, [0.0, 0.0, 6.0]), (11, [0.0, 6.0, 0.0]),
                 (18, [6.0, 0.0, 0.0])])
     cv, v = build_basis(mol, "cc-pCVDZ-F12"), build_basis(mol, "cc-pVDZ-F12")
-    extra = extra_functions(cv, v)
+    extra, nspan = extra_functions(cv, v)
+    assert nspan == 0
     atoms = np.asarray(cv.bf_to_atom)
     assert [np.sum(extra & (atoms == a)) for a in range(4)] == [4, 4, 9, 9]
     gv = assign_bf_groups(mol, v, "core_valence")
@@ -206,6 +207,21 @@ def test_core_valence_cv_basis():
     assert "26 functions not in cc-pVDZ-F12" in g.how
     with pytest.raises(ValueError):  # reference not contained
         assign_bf_groups(mol, v, {"core_valence": "cc-pCVDZ-F12"})
+
+
+def test_core_valence_recontracted():
+    """aug-cc-pwCV5Z of Br recontracts the p set of aug-cc-pV5Z (4p contraction dropped,
+    8 instead of 4 diffuse primitives uncontracted): the 4p function lies in the span, the
+    4 newly uncontracted primitives are core-correlating functions."""
+    from gemqc.basislib import build_basis
+    from gemqc.f12xg import ao_shells, extra_functions
+    mol = _mol([(35, [0.0, 0.0, 0.0])])
+    cv, v = build_basis(mol, "aug-cc-pwCV5Z"), build_basis(mol, "aug-cc-pV5Z")
+    extra, nspan = extra_functions(cv, v)
+    l, sh = ao_shells(cv)
+    p = sorted(cv.shell(s)["exponents"][0] for s in set(sh[extra & (l == 1)]))
+    assert nspan == 1 and np.allclose(p, [1.854127, 3.730389, 7.421307, 14.53963])
+    assert np.sum(extra) == 126  # with 4s4d4f3g2h1i
 
 
 # --- exact F12XG pair integrals -------------------------------------------------------

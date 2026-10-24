@@ -67,28 +67,56 @@ def _shell_key(sh):
             tuple(float(f"{x:.8g}") for x in sh["coefficients"]))
 
 
-def extra_functions(basis, ref):
-    """(nbf,) bool: the AOs of basis in shells that ref does not have (same molecule).
+#: relative residual below which a reference function counts as spanned by the basis
+SPAN_TOLERANCE = 1e-8
+
+
+def _spanned(basis, ref, s, tol):
+    """Whether the AOs of shell s of ref lie in the span of the AOs of basis with the same
+    atom and l (residual of the projection relative to the norm below tol)."""
+    sh = ref.shell(s)
+    l, _ = ao_shells(basis)
+    B = np.nonzero((np.asarray(basis.bf_to_atom) == sh["atom"]) & (l == sh["l"]))[0]
+    if B.size == 0:
+        return False
+    off = list(ref.shell_offsets) + [ref.nbf]
+    i = np.arange(off[s], off[s + 1])
+    S = np.asarray(_core.overlap(basis))[np.ix_(B, B)]
+    X = np.asarray(_core.overlap(basis, ref))[np.ix_(B, i)]
+    norm = np.diag(np.asarray(_core.overlap(ref)))[i]
+    res = norm - np.einsum("bi,bi->i", X, np.linalg.solve(S, X))
+    return bool(np.all(res <= tol * norm))
+
+
+def extra_functions(basis, ref, tol=SPAN_TOLERANCE):
+    """The AOs of basis in shells that ref does not have (same molecule).
+
+    A shell of ref without an identical shell in basis is accepted if it lies in the span
+    of the functions of basis on its atom with its l (recontracted sets, e.g. the p set
+    of aug-cc-pwCV5Z for Br, where the 4p contraction of cc-pV5Z is dropped).
+
+    Returns:
+        ((nbf,) bool extra AOs, number of shells of ref only contained by their span).
 
     Raises:
-        ValueError: ref has shells that basis does not have.
+        ValueError: ref has functions outside the span of basis.
     """
     left = {}
     for s in range(ref.nshells):
-        k = _shell_key(ref.shell(s))
-        left[k] = left.get(k, 0) + 1
+        left.setdefault(_shell_key(ref.shell(s)), []).append(s)
     off = list(basis.shell_offsets) + [basis.nbf]
     extra = np.zeros(basis.nbf, bool)
     for s in range(basis.nshells):
         k = _shell_key(basis.shell(s))
-        if left.get(k, 0):
-            left[k] -= 1
+        if left.get(k):
+            left[k].pop()
         else:
             extra[off[s]:off[s + 1]] = True
-    if any(left.values()):
+    missing = [s for v in left.values() for s in v]
+    if not all(_spanned(basis, ref, s, tol) for s in missing):
         raise ValueError(f"core_valence: reference basis '{ref.name}' is not contained in "
                          f"'{basis.name}'")
-    return extra
+    return extra, len(missing)
 
 
 def ao_shells(basis):
@@ -234,9 +262,11 @@ def _core_valence(mol, basis, ref_name, derived, threshold):
             rb = None
             how += f"; reference basis {ref_name} not available"
         if rb is not None:
-            extra = extra_functions(basis, rb)
+            extra, nspan = extra_functions(basis, rb)
             core |= extra
             how += f", and {np.sum(extra)} functions not in {ref_name}"
+            if nspan:
+                how += f" ({nspan} of its shells recontracted)"
     return BfGroups(np.where(core, 0, 1), 2, how + ")", r2)
 
 
