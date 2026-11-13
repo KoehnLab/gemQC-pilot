@@ -4,7 +4,8 @@
 
 Basis sets are JSON files from [basissetexchange.org](https://www.basissetexchange.org),
 looked up by name (case-insensitive) in `$GEMQC_DIR/lib/basis`, then in `lib/basis`
-of the repository. Spherical and Cartesian shells are supported; the function order
+of the repository (editable install), then in the copy that a regular install places
+in the package (`gemqc/basis`; reinstall after changes of `lib/basis`). Spherical and Cartesian shells are supported; the function order
 within a shell follows libint (spherical: $m = -l, \dots, l$). Basis sets with
 effective core potentials (def2 for Rb and heavier) are not supported yet and are
 rejected.

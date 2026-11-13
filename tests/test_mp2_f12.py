@@ -1,6 +1,6 @@
 """DF-MP2-F12 with fixed amplitudes (task df-mp2-f12): Molpro references for 3C, 3*C,
 NOZ, HY1 (water aug-cc-pVTZ, reference_f12/h2o-dfmp2-f12-molpro and -testcabs-molpro),
-symmetry, storage, pair energies, geminal options."""
+Turbomole fixed-A for 3A, symmetry, storage, pair energies, geminal options."""
 
 from pathlib import Path
 
@@ -27,14 +27,16 @@ def _run(tmp_path, tasks, basis="aug-cc-pVTZ", sym="nosym"):
 def test_molpro_water(tmp_path):
     """Water aug-cc-pVTZ, STG-6G (gamma = 1), RI basis AVTZ/JKFIT, MP2FIT fitting, frozen
     core excluded from the CABS singles: Molpro DF-MP2-F12 3C(FIX), 3*C(FIX), NOZ,
-    NOZ+HY1 (singlet, triplet parts); all electrons 3C(FIX,NOZ)."""
+    NOZ+HY1 (singlet, triplet parts); all electrons 3C(FIX,NOZ); with all-electron CABS
+    singles Turbomole's fixed-A (ricc2, same geminal fit) for 3A."""
     res = _run(tmp_path,
                "  - {system: w, task: df-rhf, convergence: 1e-10}\n"
                "  - {task: df-mp2-f12, cabs_auxbasis: aug-cc-pVTZ-JK, all_electron_cabs: false}\n"
                "  - {task: df-mp2-f12, all_electron_cabs: false, noz: true}\n"
                "  - {task: df-mp2-f12, all_electron_cabs: false, noz: true, hy1: true}\n"
-               "  - {task: df-mp2-f12, frozen: off, noz: true}\n")
-    _, full, noz, hy1, ae = res
+               "  - {task: df-mp2-f12, frozen: off, noz: true}\n"
+               "  - {task: df-mp2-f12, approximation: 3a}\n")
+    _, full, noz, hy1, ae, a = res
     tol = 1e-10
     assert full["energy"] == pytest.approx(-76.362038370049, abs=tol)
     assert full["e_f12_3c"] == pytest.approx(-0.028351809431, abs=tol)
@@ -53,6 +55,9 @@ def test_molpro_water(tmp_path):
     assert ae["e_f12_3c"] == pytest.approx(-0.040280496935, abs=tol)
     assert ae["e_f12_3sc"] == pytest.approx(-0.041028280861, abs=tol)
     assert ae["energy"] == pytest.approx(-76.389250236965, abs=tol)
+    assert a["e_f12"] == pytest.approx(-0.031808655311, abs=5e-10)
+    assert a["e_f12_singlet"] == pytest.approx(-0.027535809766, abs=5e-10)
+    assert a["e_f12_triplet"] == pytest.approx(-0.004272845544, abs=5e-10)
 
 
 def test_symmetry_storage_pairs(tmp_path):
@@ -181,6 +186,50 @@ def test_exact_task(tmp_path):
                    "tasks:\n  - {system: c, task: rohf}\n  - {task: df-mp2-f12}\n")
     with pytest.raises(gemqc.InputError):
         list(gemqc.run(inp, quiet=True))
+
+
+def test_approximation_a(tmp_path):
+    """3A and 3*A (water aug-cc-pVDZ): a value computes its pair only, a list all named
+    pairs with the first as the main result; DF and exact regression values, exact against
+    DF within the DF error, the F C term and the coupling as in 3C; NOZ without
+    approximation C and invalid values refused."""
+    res = _run(tmp_path, "  - {system: w, task: df-rhf, convergence: 1e-10}\n"
+                         "  - {task: df-mp2-f12, cabs_auxbasis: aug-cc-pVTZ-JK}\n"
+                         "  - {task: df-mp2-f12, approximation: 3a}\n"
+                         "  - {task: df-mp2-f12, approximation: [3*a, 3c], noz: true}\n"
+                         "  - {task: mp2-f12, approximation: 3*a}\n"
+                         "  - {task: mp2-f12, approximation: [3c, 3a]}\n",
+               basis="aug-cc-pVDZ")
+    _, c, df, mix, ex, exmix = res
+    assert "e_f12_3a" not in c and "e_f12_3c" not in df and "e_f12_3sc" not in ex
+    assert df["approximation"] == "3A(FIX)" and ex["approximation"] == "3*A(FIX)"
+    assert mix["approximation"] == "3*A(FIX)" and exmix["approximation"] == "3C(FIX)"
+    assert df["e_f12"] == pytest.approx(df["e_f12_3a"], abs=1e-15)
+    assert ex["e_f12"] == pytest.approx(ex["e_f12_3sa"], abs=1e-15)
+    assert mix["e_f12"] == pytest.approx(mix["e_f12_3sa"], abs=1e-15)
+    assert exmix["e_f12"] == pytest.approx(exmix["e_f12_3c"], abs=1e-15)
+    for k in ("e_f12_3a", "e_f12_3sa"):
+        assert mix[k] == pytest.approx(df[k], abs=1e-13)
+        assert exmix[k] == pytest.approx(ex[k], abs=1e-13)
+    assert df["e_f12_3a"] == pytest.approx(-0.085232217443, abs=1e-9)
+    assert df["e_f12_3sa"] == pytest.approx(-0.086680351159, abs=1e-9)
+    assert ex["e_f12_3a"] == pytest.approx(-0.085184161408, abs=1e-9)
+    assert ex["e_f12_3sa"] == pytest.approx(-0.086632117238, abs=1e-9)
+    for r in (mix, exmix):
+        assert r["e_f12_3a"] - r["e_f12_3sa"] == pytest.approx(
+            r["e_f12_3c"] - r["e_f12_3sc"], abs=1e-12)
+    assert exmix["e_f12_3c"] == pytest.approx(c["e_f12_3c"], abs=1e-4)
+    assert ex["e_f12_3a"] == pytest.approx(df["e_f12_3a"], abs=1e-4)
+    for task in ("{task: df-mp2-f12, approximation: 3a, noz: true}",
+                 "{task: df-mp2-f12, approximation: [3c, 3c]}",
+                 "{task: df-mp2-f12, approximation: 3b}",
+                 "{task: mp2-f12xg-pilot, gammas: [1.0, 1.5], bf_groups: core_valence,"
+                 " approximation: [3c, 3a]}"):
+        inp = tmp_path / "bad.yaml"
+        inp.write_text("systems:\n  " + WATER.format(basis="aug-cc-pVDZ", sym="nosym")
+                       + "\ntasks:\n  - {system: w, task: df-rhf}\n  - " + task + "\n")
+        with pytest.raises(gemqc.InputError):
+            list(gemqc.run(inp, quiet=True))
 
 
 def test_size_consistency_he_ne(tmp_path):

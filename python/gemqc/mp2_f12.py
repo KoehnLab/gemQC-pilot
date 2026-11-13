@@ -1,5 +1,5 @@
 """Tasks mp2-f12 and df-mp2-f12: MP2-F12 with fixed amplitudes (SP ansatz, ansatz 3),
-approximations 3C and 3*C (Molpro), optionally NOZ and HY1 (theory:
+approximations 3C and 3*C (Molpro), optionally NOZ and HY1, and 3A, 3*A (theory:
 docs/theory.md).
 
 Closed-shell Hylleraas functional with the geminal amplitudes T^ij_ij = 3/8, T^ij_ji = 1/8
@@ -10,7 +10,9 @@ Closed-shell Hylleraas functional with the geminal amplitudes T^ij_ij = 3/8, T^i
 evaluated pair by pair (f12.PairIntermediates). Singlet and triplet parts use the
 symmetric (factor 1) and antisymmetric (factor 3) amplitude components. 3C couples the
 conventional amplitudes, T^ab_ij = -(K + C c)/D, and includes the F C term in B; 3*C
-omits both.
+omits both. 3A and 3*A use B of approximation A and no X term (W = B). Option
+approximation: one value or a list; each value computes its pair (3C and 3*C, or 3A and
+3*A), the first value is the main result.
 """
 
 import time
@@ -28,7 +30,7 @@ from .restart import save_orbitals
 
 
 def fixed_amplitude_energies(inter, eps_occ, eps_vir, pair_energies=False):
-    """MP2 and MP2-F12 (3*C, 3C) energies with singlet and triplet parts.
+    """MP2 and MP2-F12 (3*C, 3C; 3*A, 3A) energies with singlet and triplet parts.
 
     Args:
         inter: f12.PairIntermediates.
@@ -37,12 +39,16 @@ def fixed_amplitude_energies(inter, eps_occ, eps_vir, pair_energies=False):
         pair_energies: Also return the pair energies.
 
     Returns:
-        dict name -> (singlet, triplet) for 'mp2', '3*C', '3C' (F12 corrections, the
-        3C coupling included in '3C'); with pair_energies 'pairs' {name: (no, no, 2)
-        array}: singlet and triplet energy of the pair ij (with ji) for i >= j.
+        dict name -> (singlet, triplet) for 'mp2', with approximation C (inter.approx_c)
+        '3*C', '3C', with approximation A (inter.approx_a) '3*A', '3A' (F12 corrections,
+        the coupling included in '3C' and '3A'); with pair_energies 'pairs' {name: (no, no,
+        2) array}: singlet and triplet energy of the pair ij (with ji) for i >= j.
     """
     no = len(eps_occ)
-    res = {k: np.zeros(2) for k in ("mp2", "3*C", "3C")}
+    names = (("3*C", "3C") if inter.approx_c else ()) + (("3*A", "3A") if inter.approx_a
+                                                          else ())
+    coupled = [k for k in names if "*" not in k]
+    res = {k: np.zeros(2) for k in ("mp2",) + names}
     pairs = {k: np.zeros((no, no, 2)) for k in res}
     for i in range(no):
         for j in range(i + 1):
@@ -53,24 +59,27 @@ def fixed_amplitude_energies(inter, eps_occ, eps_vir, pair_energies=False):
                 ts, ta = np.array([0.5]), np.zeros(1)
             else:
                 ts, ta = np.array([0.25, 0.25]), np.array([0.125, -0.125])
-            V, X = d["V"], d["X"]
-            for name, B in (("3*C", d["B3sC"]), ("3C", d["B3C"])):
-                W = B - eij * X
+            V = d["V"]
+            for name in names:
+                B = d["B" + name.replace("*", "s")]
+                W = B - eij * d["X"] if name.endswith("C") else B  # A: no X term
                 e = np.array([2 * ts @ V + ts @ W @ ts, 3 * (2 * ta @ V + ta @ W @ ta)])
                 res[name] += w * e
                 pairs[name][i, j] += w * e
-            # conventional amplitudes, uncoupled (MP2) and coupled to the geminals (3C)
+            # conventional amplitudes, uncoupled (MP2) and coupled to the geminals (3C, 3A)
             Dab = eij - eps_vir[:, None] - eps_vir[None, :]
             K, C = d["K"], d["C"]
             Cc = 0.5 * C if i == j else 0.375 * C + 0.125 * C.T
-            for name, Kx in (("mp2", K), ("3C", K + Cc)):
+            for names_, Kx in ((["mp2"], K), (coupled, K + Cc)):
                 T = Kx / Dab
                 e = np.array([np.sum(0.5 * (T + T.T) * Kx), 3 * np.sum(0.5 * (T - T.T) * Kx)])
-                res[name] += w * e
-                pairs[name][i, j] += w * e
-    # the 3C entry holds MP2 + coupling + F12: keep the correction only
-    res["3C"] -= res["mp2"]
-    pairs["3C"] -= pairs["mp2"]
+                for name in names_:
+                    res[name] += w * e
+                    pairs[name][i, j] += w * e
+    # the coupled entries hold MP2 + coupling + F12: keep the correction only
+    for name in coupled:
+        res[name] -= res["mp2"]
+        pairs[name] -= pairs["mp2"]
     out = {k: tuple(v) for k, v in res.items()}
     if pair_energies:
         out["pairs"] = pairs
@@ -139,12 +148,15 @@ def task_mp2_f12(system, options, ctx):
     except ValueError as e:
         raise InputError(f"mp2-f12: {e}") from None
     approx = _approximation(options)
+    approx_c, approx_a = _families(approx)
+    if not approx_c and (options["noz"] or options["hy1"]):
+        raise InputError("mp2-f12: noz and hy1 apply to approximation C only")
     print_spaces(spaces, list(wf.irrep_names), out)
     out.value("geminal", geminal.describe())
     if not geminal.exact:
         out.value("  exponents", " ".join(f"{a:.5f}" for a in geminal.exponents))
         out.value("  coefficients", " ".join(f"{c:.5f}" for c in geminal.coefficients))
-    out.value("approximation", approx + " (fixed amplitudes 1/2, 1/4; ansatz 3)")
+    out.value("approximation", ", ".join(approx) + " (fixed amplitudes 1/2, 1/4; ansatz 3)")
     ri, cabs_name, how = ri_space(system, spaces, options, df, out)
     print_ri_space(ri, how, out)
     out.flush()
@@ -155,11 +167,12 @@ def task_mp2_f12(system, options, ctx):
     fit = None
     if df:
         fit = fitting_basis(system, options, out)
-        ints = F12Integrals(ri, a.nfrozen, a.nocc, fit, geminal, options["integrals"])
+        ints = F12Integrals(ri, a.nfrozen, a.nocc, fit, geminal, options["integrals"],
+                            approx_c, approx_a)
         out.value("3-index integrals", f"{ints.store.describe()}, {ints.time:.2f} s")
     else:
         ints = ExactF12Integrals(ri, a.nfrozen, a.nocc, geminal, options["threshold"],
-                                 options["integrals"])
+                                 options["integrals"], approx_c, approx_a)
         out.value("pair integrals", f"exact, {ints.store.describe()}, {ints.time:.2f} s")
     out.flush()
     res = pair_energies(ints, ri, a, options, out)
@@ -231,15 +244,16 @@ def report(system, options, ctx, method, spaces, res, e_singles, group, attrs):
     out = ctx.out
     a = spaces.alpha
     e_scf = system.wavefunction.energy
-    tag = _tag(options)
     e_mp2 = sum(res["mp2"])
     out()
     out(f"  {'':34s} {'singlet':>18s} {'triplet':>18s} {'total':>18s}")
-    rows = [("MP2", res["mp2"])] + [(f"F12 correction {n}{tag}", res[n]) for n in ("3*C", "3C")]
+    rows = [("MP2", res["mp2"])] + [(f"F12 correction {n}{_tag(options, n)}", res[n])
+                                    for n in ("3*C", "3C", "3*A", "3A") if n in res]
     for label, (s_, t_) in rows:
         out(f"  {label:34s} {s_:18.12f} {t_:18.12f} {s_ + t_:18.12f}")
     out()
-    sel = _approximation(options).upper()
+    sel = _approximation(options)[0].upper()
+    tag = _tag(options, sel)
     e_f12 = sum(res[sel])
     out.value("SCF energy", e_scf, "Eh", "18.12f")
     out.value("CABS singles", e_singles, "Eh", "18.12f")
@@ -268,7 +282,8 @@ def report(system, options, ctx, method, spaces, res, e_singles, group, attrs):
             "e_reference": e_scf + e_singles, "e_cabs_singles": e_singles,
             "mp2_correlation_energy": e_mp2, "e_mp2_singlet": res["mp2"][0],
             "e_mp2_triplet": res["mp2"][1], "e_f12": e_f12,
-            "e_f12_3c": sum(res["3C"]), "e_f12_3sc": sum(res["3*C"]),
+            **{f"e_f12_{n.replace('*', 's').lower()}": sum(res[n])
+               for n in ("3C", "3*C", "3A", "3*A") if n in res},
             "e_f12_singlet": res[sel][0], "e_f12_triplet": res[sel][1],
             "correlation_energy": e_mp2 + e_f12}
     if core:
@@ -289,11 +304,18 @@ def report(system, options, ctx, method, spaces, res, e_singles, group, attrs):
 
 
 def _approximation(options):
-    return options["approximation"].lower()
+    """The approximations of the task (list, main result first)."""
+    v = options["approximation"]
+    return [x.lower() for x in ([v] if isinstance(v, str) else v)]
 
 
-def _tag(options):
-    flags = [f for f in ("noz", "hy1") if options[f]]
+def _families(approx):
+    """(approximation C, approximation A) needed for the list approx."""
+    return any(x.endswith("c") for x in approx), any(x.endswith("a") for x in approx)
+
+
+def _tag(options, name):
+    flags = [f for f in ("noz", "hy1") if options[f] and name.endswith("C")]
     return "(" + ",".join(["FIX"] + [f.upper() for f in flags]) + ")"
 
 

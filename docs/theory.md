@@ -93,6 +93,22 @@ Approximations (Molpro names): **3C** all terms;
 **3\*C** without the $F\,C$ term in $B$ and without the coupling below; **NOZ** omits
 $Z$ (generalized Brillouin condition in $B$); **HY1** omits $\tilde Y$.
 
+**Approximation A** (3A, 3\*A; Turbomole's fixed-A): no $[\bar{F^2}]$, $\tilde Y$, $Z$ or
+$X$ terms; instead of $[\bar{F^2}]$ the Hartree transformation on the $kl$ side,
+
+$$
+B^{kl}_{mn} = \tfrac12 \hat S\big(A' - F^{kl}_{ab} C^{ab}_{mn}\big),\qquad
+A'^{kl}_{mn} = U^{kl}_{mn} - \sum_{\hat P} \big(\bar F^{pq}_{kl} - \ddot F^{pq}_{kl}\big) F^{pq}_{mn},
+$$
+
+with $\bar F$ as above and $\ddot F^{pq}_{kl} = \langle \tilde k l|F|pq\rangle + \langle k
+\tilde l|F|pq\rangle$, $|\tilde k\rangle = \sum_{p'} |p'\rangle (h+J)_{p'k}$ (RI projection
+of $(h + J)|k\rangle$). The $X$ term is dropped in the energy. 3A couples the
+conventional amplitudes as 3C, 3\*A omits the $F\,C$ term and the coupling. Water
+(aug-cc-pVTZ, STG-6G and Turbomole's LCG geminal) agrees with Turbomole's fixed-A to
+1e-10 Eh; Molpro's 3A(FIX) uses a slightly different approximation for the $B$ and $C$ intermediate 
+and differs by about 5e-5 Eh.
+
 **Energy** (closed shell; fixed amplitudes $T^{ij}_{ij} = 3/8$, $T^{ij}_{ji} = 1/8$, i.e.
 1/2 for singlet and 1/4 for triplet pairs; $\tilde T = 2T - T^{\mathrm{swap}}$):
 

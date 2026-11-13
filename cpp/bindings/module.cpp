@@ -232,6 +232,32 @@ PYBIND11_MODULE(_core, m) {
       "K^ij(nu, si) = sum_{mu,la in bo} (mu nu|g|la si) C_mu,i C_la,j, nu in b1, si in b2,\n"
       "for the orbital pairs (i, j) (columns of Co over bo): list of (n1, n2) matrices");
   m.def(
+      "mo_integrals",
+      [](const TwoBodyOperator& op, const BasisSet& b1, const Matrix& C1, const BasisSet& b2,
+         const Matrix& C2, const BasisSet& b3, const Matrix& C3, const BasisSet& b4,
+         const Matrix& C4, double threshold, const std::vector<std::array<int, 4>>& blocks,
+         Eigen::Index block_size, int nblocks) {
+        Matrix* Y;
+        {
+          py::gil_scoped_release release;
+          Y = new Matrix(mo_integrals(op, b1, C1, b2, C2, b3, C3, b4, C4, threshold, blocks,
+                                      block_size, nblocks));
+        }
+        py::capsule owner(Y, [](void* p) { delete static_cast<Matrix*>(p); });
+        return py::array_t<double>({py::ssize_t(C1.cols()), py::ssize_t(C2.cols()),
+                                    py::ssize_t(C3.cols()), py::ssize_t(C4.cols())},
+                                   Y->data(), owner);
+      },
+      py::arg("operator"), py::arg("b1"), py::arg("C1"), py::arg("b2"), py::arg("C2"),
+      py::arg("b3"), py::arg("C3"), py::arg("b4"), py::arg("C4"),
+      py::arg("threshold") = 1e-12, py::arg("blocks") = std::vector<std::array<int, 4>>{},
+      py::arg("block_size") = 0, py::arg("nblocks") = 0,
+      "(i j|g|k l) = sum (mu nu|g|la si) C1_mu,i C2_nu,j C3_la,k C4_si,l (n1, n2, n3, n4),\n"
+      "mu, nu, la, si in b1, b2, b3, b4; uses the permutational symmetry of equal\n"
+      "(basis, coefficients) and skips zero coefficient blocks (masked orbitals). blocks:\n"
+      "only these column-block tuples are needed (block (column // block_size) % nblocks),\n"
+      "the others are incomplete");
+  m.def(
       "two_body_4c",
       [](const TwoBodyOperator& op, const BasisSet& b1, const BasisSet* b2,
          const BasisSet* b3, const BasisSet* b4) {

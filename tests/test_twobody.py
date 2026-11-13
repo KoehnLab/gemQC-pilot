@@ -273,6 +273,42 @@ def test_mixed_bases():
     assert np.abs(M3 - U3[np.ix_(idx2, idx1, idx2)]).max() < 1e-14
 
 
+@pytest.mark.parametrize("kind,zeta", [("stg", 1.0), ("coulomb", 0.0)])
+def test_mo_integrals(kind, zeta):
+    """mo_integrals against the transformed AO integrals: all indices equal (8-fold
+    symmetry) with masked coefficients, symmetric ket only, and no symmetry (mixed bases)."""
+    centres = [(1, [0.0, 0.0, 0.0]), (2, [0.3, 1.2, -0.5])]
+    _, bs = _basis(centres, {1: [(0, 1.2), (2, 0.7), (1, 0.4), (3, 0.9)],
+                             2: [(1, 0.6), (0, 0.25)]})
+    _, b2 = _basis(centres, {1: [(1, 0.4), (3, 0.9)], 2: [(0, 0.25)]})
+    op = _core.TwoBodyOperator(kind, zeta)
+    rng = np.random.default_rng(7)
+    n = bs.nbf
+    C = rng.standard_normal((n, 3))
+    mask = np.zeros(n, bool)
+    mask[[0, 1, 2, 3, 4, 5, 16, 17, 18]] = True  # s, d on atom 1 and p on atom 2
+    Cx = np.hstack([C * mask[:, None], C * ~mask[:, None]])
+    V = _core.two_body_4c(op, bs)
+    ref = np.einsum("pqrs,pi,qj,rk,sl->ijkl", V, Cx, Cx, Cx, Cx, optimize=True)
+    Y = _core.mo_integrals(op, bs, Cx, bs, Cx, bs, Cx, bs, Cx)
+    assert np.abs(Y - ref).max() < 1e-12 * np.abs(ref).max()
+    # only some blocks (G, G1, H, H1) of the masks (3 columns each) needed
+    blocks = [(0, 1, 1, 0), (1, 1, 0, 0)]
+    Y = _core.mo_integrals(op, bs, Cx, bs, Cx, bs, Cx, bs, Cx, 1e-12, blocks, 3, 2)
+    for t in blocks:
+        sl = np.ix_(*[range(3 * g, 3 * g + 3) for g in t])
+        assert np.abs(Y[sl] - ref[sl]).max() < 1e-12 * np.abs(ref).max()
+    D =rng.standard_normal((n, 2))
+    ref = np.einsum("pqrs,pi,qj,rk,sl->ijkl", V, Cx, D, Cx, Cx, optimize=True)
+    Y = _core.mo_integrals(op, bs, Cx, bs, D, bs, Cx, bs, Cx)
+    assert np.abs(Y - ref).max() < 1e-12 * np.abs(ref).max()
+    E = rng.standard_normal((b2.nbf, 4))
+    V2 = _core.two_body_4c(op, bs, b2, bs, bs)
+    ref = np.einsum("pqrs,pi,qj,rk,sl->ijkl", V2, Cx, E, C, Cx, optimize=True)
+    Y = _core.mo_integrals(op, bs, Cx, b2, E, bs, C, bs, Cx)
+    assert np.abs(Y - ref).max() < 1e-12 * np.abs(ref).max()
+
+
 # --- contracted Gaussian geminals (STG-nG) -------------------------------------------------
 
 def _gauss_potential(kind, gtg, alpha, R):

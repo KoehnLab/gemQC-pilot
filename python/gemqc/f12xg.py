@@ -279,7 +279,8 @@ class ExactF12XGIntegrals:
     The geminal is a sum over group pairs with group-masked occupied orbitals,
     g_ij = sum_GH f_GH phi_i^G(1) phi_j^H(2), so every integral is a sum of standard pair
     integrals (C++ `pair_integrals` over the masked columns (i^G, j^H) of Cx, one call per
-    operator). Per pair i >= j (stored, memory/disk): ``F = <p'q'|g_ij>`` (N' x N') and
+    operator and group pair; only the shells of G and H enter). Per pair i >= j (stored,
+    memory/disk): ``F = <p'q'|g_ij>`` (N' x N') and
     ``G = <ij|r12^-1|p'q'>`` (as ExactF12Integrals). Small arrays over the active orbitals,
     [k, l, m, n] with the geminal pair (k, l) and the plain or other-geminal pair (m, n)::
 
@@ -288,6 +289,9 @@ class ExactF12XGIntegrals:
         F2 = <g_mn|g_kl>                          (f_G'H' f_GH)
         H1 = w <(hJ m^G') n^H'|f_G'H' f_GH|k^G l^H> (hJ = h + 2J on electron 1 via the RI;
                                                    w: kinetic_weight(G'H', GH))
+
+    These come from the MO integrals over the masked orbitals (C++ `mo_integrals`, one call
+    per distinct operator; permutational symmetry of the quartets).
 
     Args:
         ri: cabs.RISpace.
@@ -327,37 +331,32 @@ class ExactF12XGIntegrals:
         Hx_ri = C @ (ri.hj @ (C.T @ (S @ Cx_ri)))   # hJ i^G in the RI
         col = lambda G, i: G * nact + i  # noqa: E731
 
-        def gpairs(T, plist):
-            """Masked column pairs of the group-pair type T for the orbital pairs plist:
-            [(orbital pair, (G, H), (col_k, col_l))]."""
-            G, H = T
-            out = [(p, (G, H), (col(G, p[0]), col(H, p[1]))) for p in plist]
-            if G != H:
-                out += [(p, (H, G), (col(H, p[0]), col(G, p[1]))) for p in plist]
-            return out
-
-        def run(op, b1, b2, plist, T, per):
-            """pair_integrals of op over the masked pairs of type T, in batches:
-            yields (orbital pair, (G, H), K)."""
-            items = gpairs(T, plist)
+        def run(op, b1, b2, cols, per):
+            """pair_integrals of op over the masked column pairs cols, in batches (the shells
+            with zero coefficients are skipped): yields K for each column pair."""
             limit = _core.memory()
-            nb = max(1, int(0.5 * limit // per)) if limit else len(items)
-            for k in range(0, len(items), nb):
-                chunk = items[k:k + nb]
-                K = _core.pair_integrals(op, bo, b1, b2, Cx, [c for _, _, c in chunk],
-                                         threshold)
-                for (p, gh, _), Kp in zip(chunk, K):
-                    yield p, gh, np.asarray(Kp)
+            nb = max(1, int(0.5 * limit // per)) if limit else len(cols)
+            for k in range(0, len(cols), nb):
+                yield from map(np.asarray, _core.pair_integrals(op, bo, b1, b2, Cx,
+                                                                cols[k:k + nb], threshold))
 
-        # F = <p'q'|g_ij>: both free indices in the RI basis
-        F = {p: np.zeros((N, N)) for p in pairs}
-        for T in geminal.pairs:
-            op = geminal.operators(*T)["f12"]
-            for p, _, K in run(op, bri, bri, pairs, T, bri.nbf ** 2 * DOUBLE):
-                F[p] += C.T @ K @ C
+        # F = <p'q'|g_ij> = sum_GH (i^G p'|f_GH|j^H q'): both free indices in the RI basis,
+        # accumulated over the group pairs in the AO basis. For G != H one orientation over
+        # all ordered pairs: (i^H p'|f|j^G q') = (j^G q'|f|i^H p') (b1 = b2)
+        Fao = {p: np.zeros((bri.nbf, bri.nbf)) for p in pairs}
+        for G, H in geminal.pairs:
+            op = geminal.operators(G, H)["f12"]
+            plist = pairs if G == H else ordered
+            for (i, j), K in zip(plist, run(op, bri, bri, [(col(G, i), col(H, j))
+                                                          for i, j in plist],
+                                            bri.nbf ** 2 * DOUBLE)):
+                if i >= j:
+                    Fao[(i, j)] += K
+                if G != H and i <= j:
+                    Fao[(j, i)] += K.T
         for p, n in self.index.items():
-            self.store.set("F", n, F[p])
-        del F
+            self.store.set("F", n, C.T @ Fao.pop(p) @ C)
+        del Fao
         # G = <ij|r12^-1|p'q'>: no geminal (as ExactF12Integrals)
         coul = _core.TwoBodyOperator("coulomb")
         half = {p: C.T @ np.asarray(K) @ Cobs for p, K in zip(ordered, _core.pair_integrals(
@@ -369,33 +368,36 @@ class ExactF12XGIntegrals:
             G[:o, nmo:] = half[(j, i)][nmo:, :o].T  # <ij|o x> = <ji|x o>
             self.store.set("G", n, G)
         del half
-        # small arrays over the ordered active pairs
+        # small arrays over the active orbitals from the MO integrals over the masked
+        # orbitals, Y[G, k, G1, m, H, l, H1, n] = (k^G m^G1|op|l^H n^H1) (C++ mo_integrals,
+        # one call per distinct operator, all four indices transformed at once)
         na = nact
-        self.FG = np.zeros((na,) * 4)
-        self.U = np.zeros((na,) * 4)
-        self.F2 = np.zeros((na,) * 4)
-        self.H1 = np.zeros((na,) * 4)
-        for T in geminal.pairs:
-            op = geminal.operators(*T)["f12/r12"]
-            for (k, l), _, K in run(op, bo, bo, ordered, T, bo.nbf ** 2 * DOUBLE):
-                self.FG[k, l] += Co.T @ K @ Co
-        bra_masks = {Tb: gpairs(Tb, [(0, 0)]) for Tb in geminal.pairs}
-        for Tb in geminal.pairs:
-            masks = [gh for _, gh, _ in bra_masks[Tb]]  # bra group pairs (G', H') of Tb
-            for T in geminal.pairs:
-                prod = geminal.product_operators(Tb, T)
-                for (k, l), _, K in run(prod["grad f12 . grad f12"], bo, bo, ordered, T,
-                                        bo.nbf ** 2 * DOUBLE):
-                    for G1, H1 in masks:
-                        self.U[k, l] += Cx[:, G1 * na:(G1 + 1) * na].T @ K @ \
-                            Cx[:, H1 * na:(H1 + 1) * na]
-                w = kinetic_weight(geminal, Tb, T)
-                for (k, l), _, K in run(prod["f12 x f12"], bri, bo, ordered, T,
-                                        bri.nbf * bo.nbf * DOUBLE):
-                    for G1, H1 in masks:
-                        Kn = K @ Cx[:, H1 * na:(H1 + 1) * na]
-                        self.F2[k, l] += Cx_ri[:, G1 * na:(G1 + 1) * na].T @ Kn
-                        self.H1[k, l] += w * (Hx_ri[:, G1 * na:(G1 + 1) * na].T @ Kn)
+
+        def orient(T):
+            return {T, T[::-1]}
+
+        def mo(op, blocks, b2=bo, C2=Cx):
+            """Y of op; only the blocks (G, G1, H, H1) are needed (the other quartets of
+            group shells are skipped)"""
+            Y = np.asarray(_core.mo_integrals(op, bo, Cx, b2, C2, bo, Cx, bo, Cx, threshold,
+                                              sorted(blocks), na, ng))
+            return Y.reshape(ng, na, -1, ng, na, ng, na, ng, na)
+
+        def fg(T):  # all four indices masked (8-fold symmetry), summed over G1, H1
+            Y = mo(geminal.operators(*T)["f12/r12"], {(G, G1, H, H1) for G, H in orient(T)
+                                                      for G1 in range(ng) for H1 in range(ng)})
+            return Y[:, :, 0].sum(axis=(2, 6), keepdims=True)
+
+        CH = np.hstack([Cx_ri, Hx_ri])
+
+        def prod(Tb, T):  # F2 and H1 from the bra orbitals [m^G1, hJ m^G1] (RI) in one call
+            ops = geminal.product_operators(Tb, T)
+            blocks = {(G, G1, H, H1) for Tk, Tbra in {(T, Tb), (Tb, T)}
+                      for G, H in orient(Tk) for G1, H1 in orient(Tbra)}
+            Yh = mo(ops["f12 x f12"], blocks, bri, CH)
+            return mo(ops["grad f12 . grad f12"], blocks)[:, :, 0], Yh[:, :, 0], Yh[:, :, 1]
+
+        self.FG, self.U, self.F2, self.H1 = _small_arrays(geminal, na, fg, prod)
         self.time = time.time() - t0
 
     def pair(self, i, j):
@@ -425,9 +427,10 @@ class DFF12XGIntegrals:
 
     Fit coefficients are linear in the orbitals, so those of doubly masked and
     hJ-transformed densities are contractions of d_{k^G}. Stored per active k (naux x N'):
-    d of each mask, the Coulomb (P|k p') and G~ of f_T for each mask G in T. The blocks
-    FG, U, F2, H1 (as ExactF12XGIntegrals) come from small arrays over the masked active
-    orbitals (orbital basis; RI basis for the hJ-transformed ones).
+    d of each mask, the Coulomb (P|k p') and Z_{k^G} = sum_H G~_{k^H} of f_GH, so that
+    F_ij = sum_G d_{i^G}^T Z_{j^G} + Z_{i^G}^T d_{j^G}. The blocks FG, U, F2, H1 (as
+    ExactF12XGIntegrals) come from small arrays over the masked active orbitals (orbital
+    basis; RI basis for the hJ-transformed ones).
 
     Args:
         ri: cabs.RISpace.
@@ -452,8 +455,7 @@ class DFF12XGIntegrals:
         self.pairs_T = geminal.pairs
         naux = fit.nbf
         self.naux = naux
-        big = [f"d{G}" for G in self.groups] + ["coulomb"] + \
-            [_fname(T, G) for T in geminal.pairs for G in sorted(set(T))]
+        big = [f"{x}{G}" for x in "dZ" for G in self.groups] + ["coulomb"]
         self.store = ThreeIndexStore(len(big) * na * naux * N * DOUBLE, mode,
                                      "f12xg_3index")
         bo, bri, C = ri.obs_basis, ri.basis, ri.C
@@ -476,81 +478,76 @@ class DFF12XGIntegrals:
         def M(op):
             return np.asarray(_core.two_body_2c(op, fit))
 
-        def robust(op, R, d):  # G~ = (P|op|rho) - 1/2 (P|op|Q) d_rho
-            return R - 0.5 * np.einsum("PQ,kQq->kPq", M(op), d, optimize=True)
-        # large arrays: masked Coulomb fit, Coulomb, robust f_T per mask
+        def robust(M, R, d):  # G~ = (P|op|rho) - 1/2 (P|op|Q) d_rho, M = (P|op|Q)
+            return R - 0.5 * np.einsum("PQ,kQq->kPq", M, d, optimize=True)
+        # large arrays: masked Coulomb fit, Coulomb, Z_G = sum_H G~ of f_GH for the mask H
         B = three(coul, bri, Cx_ri, C)                       # (ng nact, naux, N')
-        d = {G: np.stack([cho_solve(J, B[k]) for k in range(G * na, (G + 1) * na)])
-             for G in self.groups}
+        d = np.stack([cho_solve(J, B[k]) for k in range(ng * na)])
         for G in self.groups:
-            self.store.put(f"d{G}", d[G])
+            self.store.put(f"d{G}", d[sl(G)])
         self.store.put("coulomb", sum(B[sl(G)] for G in self.groups))
         del B
+        Z = np.zeros_like(d)
         for T in geminal.pairs:
             op = geminal.operators(*T)["f12"]
             masks = sorted(set(T))
             R = three(op, bri, np.hstack([Cx_ri[:, sl(G)] for G in masks]), C)
-            for n, G in enumerate(masks):
-                self.store.put(_fname(T, G), robust(op, R[n * na:(n + 1) * na], d[G]))
+            Gt = robust(M(op), R, np.vstack([d[sl(G)] for G in masks]))
             del R
-        # small arrays: fit coefficients of the masked active densities
-        dm = {G: d[G][:, :, act] for G in self.groups}                  # (k^G m)
-        dmm = {(G, G1): np.einsum("kPq,qm->kPm", d[G], Tx[:, sl(G1)], optimize=True)
-               for G in self.groups for G1 in self.groups}              # (k^G m^G1)
-        dmh = {(G, G1): np.einsum("kPq,qm->kPm", d[G], Hx[:, sl(G1)], optimize=True)
-               for G in self.groups for G1 in self.groups}              # (k^G hJ m^G1)
-        ein = lambda a, b: np.einsum("kPm,lPn->klmn", a, b, optimize=True)  # noqa: E731
-        # FG[k, l, m, n] = <mn|g_kl/r12> = sum_GH (k^G m|f_GH/r12|l^H n)
-        self.FG = np.zeros((na,) * 4)
-        for T in geminal.pairs:
+            for n, X in enumerate(masks):  # to Z of the partner group of the mask X in T
+                Z[sl(T[0] if X == T[1] else T[1])] += Gt[n * na:(n + 1) * na]
+            del Gt
+        for G in self.groups:
+            self.store.put(f"Z{G}", Z[sl(G)])
+        del Z
+        # small arrays: fit coefficients of the masked active densities (k^G m), (k^G m^G1),
+        # (k^G hJ m^G1), MO integrals Y[G, k, G1, m, H, l, H1, n] = (k^G m^G1|op|l^H n^H1)
+        dm = d[:, :, act]
+        dmm = np.einsum("kPq,qm->kPm", d, Tx, optimize=True)
+        dmh = np.einsum("kPq,qm->kPm", d, Hx, optimize=True)
+        del d
+
+        def ein(a, ga, b, gb):  # (k m|l n) = sum_P a(k m) G~b(l n) + G~a(k m) b(l n)
+            return np.einsum("kPm,lPn->kmln", a, gb, optimize=True) + \
+                np.einsum("kPm,lPn->kmln", ga, b, optimize=True)
+
+        def only(X, groups):  # masked orbitals of the needed groups (others skipped)
+            return np.hstack([X[:, sl(G)] * (G in groups) for G in self.groups])
+
+        def fg(T):
             op = geminal.operators(*T)["f12/r12"]
-            R = three(op, bo, Cx, Co)
-            Gt = {G: robust(op, R[sl(G)], dm[G]) for G in self.groups}
-            for G, H in {T, T[::-1]}:
-                self.FG += ein(dm[G], Gt[H]) + ein(Gt[G], dm[H])
-        # U, F2, H1 [k, l, m, n] = sum <m^G' n^H'| op(T', T) |k^G l^H>, op symmetric in
-        # T', T: densities (k^G m^G') and (l^H n^H'), H1 with hJ m^G' (weighted, see
-        # kinetic_weight)
-        self.U, self.F2, self.H1 = (np.zeros((na,) * 4) for _ in range(3))
-        done = set()
-        for Tb in geminal.pairs:
-            for T in geminal.pairs:
-                key = tuple(sorted((Tb, T)))
-                if key in done:
-                    continue
-                done.add(key)
-                prod = geminal.product_operators(Tb, T)
-                ops = {"U": prod["grad f12 . grad f12"], "F2": prod["f12 x f12"]}
-                Gt = {}
-                for name, op in ops.items():
-                    R = three(op, bo, Cx, Cx)
-                    Gt[name] = {(G, G1): robust(op, R[sl(G), :, sl(G1)], dmm[(G, G1)])
-                                for G in self.groups for G1 in self.groups}
-                op = ops["F2"]
-                R = three(op, bri, Cx_ri, Hx_ri)
-                Gh = {(G, G1): robust(op, R[sl(G), :, sl(G1)], dmh[(G, G1)])
-                      for G in self.groups for G1 in self.groups}
-                # all (ket T, bra T') assignments of this operator
-                for Tk, Tbra in {(Tb, T), (T, Tb)}:
-                    w = kinetic_weight(geminal, Tbra, Tk)
-                    for G, H in {Tk, Tk[::-1]}:
-                        for G1, H1 in {Tbra, Tbra[::-1]}:
-                            a, b = (G, G1), (H, H1)
-                            self.U += ein(dmm[a], Gt["U"][b]) + ein(Gt["U"][a], dmm[b])
-                            self.F2 += ein(dmm[a], Gt["F2"][b]) + ein(Gt["F2"][a], dmm[b])
-                            self.H1 += w * (ein(dmh[a], Gt["F2"][b]) + ein(Gh[a], dmm[b]))
+            Gt = robust(M(op), three(op, bo, only(Cx, T), Co), dm)
+            return ein(dm, Gt, dm, Gt).reshape(ng, na, 1, na, ng, na, 1, na)
+
+        CH = np.hstack([Cx_ri, Hx_ri])
+
+        def prod(Tb, T):
+            ops = geminal.product_operators(Tb, T)
+            need = set(T) | set(Tb)  # groups of k^G, l^H
+            op = ops["grad f12 . grad f12"]
+            Gt = robust(M(op), three(op, bo, only(Cx, need), Cx), dmm)
+            YU = ein(dmm, Gt, dmm, Gt).reshape((ng, na) * 4)
+            # F2 and the hJ-transformed bra densities in one call (RI basis)
+            op = ops["f12 x f12"]
+            R, Mf = three(op, bri, only(Cx_ri, need), CH), M(op)
+            Gt = robust(Mf, R[:, :, :ng * na], dmm)
+            Gh = robust(Mf, R[:, :, ng * na:], dmh)
+            del R
+            YF = ein(dmm, Gt, dmm, Gt).reshape((ng, na) * 4)
+            YH = ein(dmh, Gh, dmm, Gt).reshape((ng, na) * 4)
+            return YU, YF, YH
+
+        self.FG, self.U, self.F2, self.H1 = _small_arrays(geminal, na, fg, prod)
         self.time = time.time() - t0
 
     def pair(self, i, j):
-        """Pair integrals of the active pair (i, j), i >= j (as ExactF12XGIntegrals.pair)."""
+        """Pair integrals of the active pair (i, j), i >= j (as ExactF12XGIntegrals.pair):
+        F = sum_G d_Gi^T Z_Gj + Z_Gi^T d_Gj."""
         get = self.store.get
-        d = {(G, k): get(f"d{G}", k) for G in self.groups for k in {i, j}}
         F = np.zeros((self.N, self.N))
         for G in self.groups:
-            for H in self.groups:
-                T = (min(G, H), max(G, H))
-                F += d[(G, i)].T @ get(_fname(T, H), j) + get(_fname(T, G), i).T @ d[(H, j)]
-        di = sum(d[(G, i)] for G in self.groups)
+            F += get(f"d{G}", i).T @ get(f"Z{G}", j) + get(f"Z{G}", i).T @ get(f"d{G}", j)
+        di = sum(get(f"d{G}", i) for G in self.groups)
         out = {"F": F, "G": di.T @ get("coulomb", j)}
         out.update(_blocks(self, i, j))
         return out
@@ -576,9 +573,29 @@ def kinetic_weight(geminal, bra, ket):
     return 2.0 * gb / (ga + gb)
 
 
-def _fname(T, G):
-    """Store name of the robust f_T array of the mask G."""
-    return f"f{T[0]}{T[1]}_mask{G}"
+def _small_arrays(geminal, na, fg, prod):
+    """FG, U, F2, H1 [k, l, m, n] (see ExactF12XGIntegrals) from MO integrals over the masked
+    active orbitals, Y[G, k, G1, m, H, l, H1, n] = (k^G m^G1|op|l^H n^H1): fg(T) for f_T/r12
+    (m, n unmasked: G1 = H1 = 0), prod(T', T) -> (Y of (grad f_T').(grad f_T), of f_T' f_T,
+    of f_T' f_T with hJ m^G1) for each unordered pair of group pairs (the product operators
+    are symmetric in T', T)."""
+    def gsum(Y, ket, bra):
+        """sum of Y[G, k, G1, m, H, l, H1, n] over the orientations (G, H) of the ket group
+        pair and (G1, H1) of the bra group pair, as [k, l, m, n]"""
+        return sum(Y[G, :, G1, :, H, :, H1, :] for G, H in {ket, ket[::-1]}
+                   for G1, H1 in {bra, bra[::-1]}).transpose(0, 2, 1, 3)
+
+    FG, U, F2, H1 = (np.zeros((na,) * 4) for _ in range(4))
+    for T in geminal.pairs:
+        FG += gsum(fg(T), T, (0, 0))
+    for n, Tb in enumerate(geminal.pairs):
+        for T in geminal.pairs[n:]:
+            YU, YF, YH = prod(Tb, T)
+            for Tk, Tbra in {(T, Tb), (Tb, T)}:
+                U += gsum(YU, Tk, Tbra)
+                F2 += gsum(YF, Tk, Tbra)
+                H1 += kinetic_weight(geminal, Tbra, Tk) * gsum(YH, Tk, Tbra)
+    return FG, U, F2, H1
 
 
 def _blocks(ints, i, j):
@@ -609,8 +626,8 @@ def task_mp2_f12xg_pilot(system, options, ctx):
     """
     from .correlation import orbital_spaces, print_spaces
     from .geminal import XGGeminal
-    from .mp2_f12 import (_approximation, cabs_singles_energy, fitting_basis, pair_energies,
-                          print_ri_space, report, ri_space)
+    from .mp2_f12 import (_approximation, _families, cabs_singles_energy, fitting_basis,
+                          pair_energies, print_ri_space, report, ri_space)
     from .options import InputError
     out = ctx.out
     wf = system.wavefunction
@@ -634,12 +651,14 @@ def task_mp2_f12xg_pilot(system, options, ctx):
     except (ValueError, TypeError) as e:
         raise InputError(f"mp2-f12xg-pilot: {e}") from None
     approx = _approximation(options)
+    if _families(approx)[1]:
+        raise InputError("mp2-f12xg-pilot: approximation A not implemented")
     print_spaces(spaces, list(wf.irrep_names), out)
     for line in groups.summary(system.molecule, system.basis):
         out("  " + line)
     for line in geminal.describe():
         out("  geminal " + line)
-    out.value("approximation", approx + " (fixed amplitudes 1/2, 1/4; ansatz 3)")
+    out.value("approximation", ", ".join(approx) + " (fixed amplitudes 1/2, 1/4; ansatz 3)")
     ri, cabs_name, how = ri_space(system, spaces, options, df, out)
     print_ri_space(ri, how, out)
     out.flush()

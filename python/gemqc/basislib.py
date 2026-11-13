@@ -1,6 +1,7 @@
 """Basis set library: locate and read basis sets in BSE JSON format; basis sets per atom.
 
-Search path: $GEMQC_DIR/lib/basis, then lib/basis of the source tree.
+Search path: $GEMQC_DIR/lib/basis, then lib/basis of the source tree (editable install),
+then the copy installed with the package (regular install).
 
 A basis is given by a name (all atoms) or per atom: a mapping with the keys `default`,
 element symbols, atom numbers (1-based) and atom labels (precedence: atom > element >
@@ -18,15 +19,16 @@ from pathlib import Path
 from ._core import BasisSet, ShellDef, element_symbol, element_z
 
 _SRC_BASIS_DIR = Path(__file__).resolve().parents[2] / "lib" / "basis"
+_PKG_BASIS_DIR = Path(__file__).resolve().parent / "basis"
 _LNAMES = "spdfghiklmnoqrtuvwxyz"  # angular momentum letters
 
 
 def search_path():
-    """Directories searched for basis set files: $GEMQC_DIR/lib/basis, then lib/basis."""
+    """Directories searched for basis set files: $GEMQC_DIR/lib/basis, lib/basis, package."""
     dirs = []
     if "GEMQC_DIR" in os.environ:
         dirs.append(Path(os.environ["GEMQC_DIR"]) / "lib" / "basis")
-    dirs.append(_SRC_BASIS_DIR)
+    dirs += [_SRC_BASIS_DIR, _PKG_BASIS_DIR]
     return [d for d in dirs if d.is_dir()]
 
 

@@ -1,6 +1,6 @@
 """gemQC: quantum chemistry with a C++ backend and a Python frontend."""
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 from . import _core
 from ._core import (BasisSet, FockBuilder, Molecule, ScfOptions, ShellDef,

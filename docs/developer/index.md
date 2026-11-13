@@ -31,7 +31,7 @@ and stores results, and is the place for pilot implementations of new methods.
 | `cpp/src/rohf.cpp` | general open-shell SCF (ROHF) |
 | `cpp/src/grid.cpp` | basis function values at points (tests) |
 | `cpp/src/hessian.cpp` | orbital Hessian products (Newton solver) |
-| `cpp/src/twobody.cpp` | generic two-electron operators (Coulomb, Slater geminal, Yukawa, Gaussian geminals; `TwoBodyOperator`, `compute_quartet`): 2-, 3- and 4-centre AO integrals over mixed basis sets, MO 3-index integrals (`two_body_3c_mo`), pair integrals with occupied indices over the orbital basis (`pair_integrals`) |
+| `cpp/src/twobody.cpp` | generic two-electron operators (Coulomb, Slater geminal, Yukawa, Gaussian geminals; `TwoBodyOperator`, `compute_quartet`): 2-, 3- and 4-centre AO integrals over mixed basis sets, MO 3-index integrals (`two_body_3c_mo`), pair integrals with occupied indices over the orbital basis (`pair_integrals`), MO 4-index integrals with permutational symmetry and masked-orbital blocks (`mo_integrals`) |
 | `cpp/bindings/module.cpp` | pybind11 bindings |
 | `python/gemqc/driver.py` | `run`, systems, tasks, printout, results file |
 | `python/gemqc/options.py` | option tables of all tasks (check, defaults, docs) |
@@ -44,7 +44,7 @@ and stores results, and is the place for pilot implementations of new methods.
 | `python/gemqc/transform.py` | integral transformation to the correlated orbital spaces (`MOIntegrals`: class `ovov` per spin case, exact via `pair_jk` or 3-index DF, memory or HDF5 scratch file, block access) |
 | `python/gemqc/mp2.py` | task mp2: closed-shell and spin-orbital MP2 energy, singles for ROHF, SCS components, pair energies |
 | `python/gemqc/geminal.py`, `cabs.py`, `f12.py`, `mp2_f12.py` | F12: geminal (Slater or STG-nG fit) and its operators; RI basis, CABS orbitals, Fock matrices in the RI basis, CABS singles; robust-fitted 3-index F12 integrals or exact pair integrals and pair intermediates V, X, B, C (`f12.F12Integrals`, `ExactF12Integrals`, `PairIntermediates`); task mp2-f12 (energies 3C, 3*C) |
-| `python/gemqc/f12xg.py` | F12XG pilot: basis-function groups (core/valence by `<r^2>` and a valence reference basis, atoms, functions), exact pair integrals with group-masked orbitals (`ExactF12XGIntegrals`), task mp2-f12xg-pilot; geminals per group pair in `geminal.XGGeminal` |
+| `python/gemqc/f12xg.py` | F12XG pilot: basis-function groups (core/valence by `<r^2>` and a valence reference basis, atoms, functions), exact pair integrals with group-masked orbitals (`ExactF12XGIntegrals`; small arrays from `mo_integrals`), density-fitted ones (`DFF12XGIntegrals`), task mp2-f12xg-pilot; geminals per group pair in `geminal.XGGeminal` |
 | `python/gemqc/correlation.py` | orbital spaces of correlated methods: frozen core table, inner/outer core per element (`core_shells`) and classification of the correlated occupied orbitals by energy rank, frozen/deleted selection per irrep and spin, semicanonical ROHF orbitals (`freeze_first`, `diag_first`) |
 | `python/gemqc/properties.py`, `elements.py` | multipole moments (centre of mass); atomic masses |
 

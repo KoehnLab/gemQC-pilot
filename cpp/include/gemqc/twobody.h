@@ -7,6 +7,7 @@
 
 #include <libint2/engine.h>
 
+#include <array>
 #include <string>
 #include <utility>
 #include <vector>
@@ -67,6 +68,21 @@ std::vector<Matrix> pair_integrals(const TwoBodyOperator& op, const BasisSet& bo
                                    const BasisSet& b1, const BasisSet& b2, const Matrix& Co,
                                    const std::vector<std::pair<int, int>>& pairs,
                                    double threshold = 1e-12);
+
+/// MO integrals (i j|g|k l) = sum (mu nu|g|la si) C1_mu,i C2_nu,j C3_la,k C4_si,l with
+/// mu, nu, la, si in b1, b2, b3, b4: (n1*n2, n3*n4), row i*n2 + j, column k*n4 + l. One pass
+/// over the quartets with Schwarz screening, parallel over the bra shell pairs; the
+/// permutational symmetry of equal (basis, coefficients) is used (bra, ket, bra-ket), and
+/// only the shells and columns with nonzero coefficients enter (masked orbitals).
+/// blocks (optional): only the column blocks (i, j, k, l) listed are needed (column block
+/// (column / block_size) % nblocks); the quartets of shells whose columns lie in other
+/// blocks are skipped (also through the symmetry images), so the other blocks of the
+/// result are incomplete.
+Matrix mo_integrals(const TwoBodyOperator& op, const BasisSet& b1, const Matrix& C1,
+                    const BasisSet& b2, const Matrix& C2, const BasisSet& b3, const Matrix& C3,
+                    const BasisSet& b4, const Matrix& C4, double threshold = 1e-12,
+                    const std::vector<std::array<int, 4>>& blocks = {},
+                    Eigen::Index block_size = 0, int nblocks = 0);
 
 /// (P|g|Q) over two fitting (or any) basis sets: (n1, n2)
 Matrix two_body_2c(const TwoBodyOperator& op, const BasisSet& b1, const BasisSet& b2);

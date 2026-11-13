@@ -19,8 +19,8 @@ Current features:
 - density fitting for all SCF variants, MP2 and MP2-F12 (`df-` tasks)
 - properties: dipole and quadrupole moments of SCF densities
 - MP2 and SCS-MP2 energies (RHF, UHF, ROHF), exact or density-fitted, with frozen core
-- MP2-F12 with fixed amplitudes (RHF; Molpro's 3C and approximations thereof; STG-nG fit
-  of geminal; CABS singles), exact or density-fitted
+- MP2-F12 with fixed amplitudes (RHF; Molpro's 3C and approximations thereof,
+  approximation A; STG-nG fit of geminal; CABS singles), exact or density-fitted
 - **F12XG pilot**: MP2-F12 with geminals bound to groups of basis functions
 - orbital analysis (Mulliken character per orbital)
 - results in JSON, restart data (orbitals, densities) in HDF5

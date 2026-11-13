@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(gemQC VERSION 1.0.0 LANGUAGES CXX)
+project(gemQC VERSION 1.1.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -64,3 +64,8 @@ if(GEMQC_LIBINT_RPATH)
   set_target_properties(_core PROPERTIES INSTALL_RPATH "${GEMQC_LIBINT_RPATH}")
 endif()
 install(TARGETS _core LIBRARY DESTINATION gemqc)
+# basis set library in the package (regular install; the editable one uses lib/basis)
+if(NOT SKBUILD_STATE STREQUAL "editable")
+  install(DIRECTORY lib/basis/ DESTINATION gemqc/basis
+          FILES_MATCHING PATTERN "*.json" PATTERN "*.yaml")
+endif()

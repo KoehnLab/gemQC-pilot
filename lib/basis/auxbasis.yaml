@@ -23,6 +23,10 @@ jk:
   cc-pVDZ-F12: cc-pVTZ-JK      # cc-pVXZ-F12: cc-pV(X+1)Z-JK (cc-pCVXZ-F12 as for cc-pVXZ-F12)
   cc-pVTZ-F12: cc-pVQZ-JK
   cc-pVQZ-F12: cc-pV5Z-JK
+  aug-cc-pV(D+d)Z: aug-cc-pVTZ-JK   # aug-cc-pV(X+d)Z: as for aug-cc-pVXZ
+  aug-cc-pV(T+d)Z: aug-cc-pVTZ-JK
+  aug-cc-pV(Q+d)Z: aug-cc-pVQZ-JK
+  aug-cc-pV(5+d)Z: aug-cc-pV5Z-JK
   "def2-*": def2-universal-JK
   "cc-pV*Z": def2-universal-JK
   "aug-cc-pV*Z": def2-universal-JK
@@ -35,7 +39,15 @@ c:
   cc-pVDZ-F12: aug-cc-pwCVDZ-C   # cc-pVXZ-F12: aug-cc-pwCVXZ-C (cc-pCVXZ-F12: own -C files,
   cc-pVTZ-F12: aug-cc-pwCVTZ-C   # H and He from aug-cc-pwCVXZ-C)
   cc-pVQZ-F12: aug-cc-pwCVQZ-C
+  aug-cc-pV(D+d)Z: aug-cc-pVDZ-C   # aug-cc-pV(X+d)Z: as for aug-cc-pVXZ
+  aug-cc-pV(T+d)Z: aug-cc-pVTZ-C
+  aug-cc-pV(Q+d)Z: aug-cc-pVQZ-C
+  aug-cc-pV(5+d)Z: aug-cc-pV5Z-C
 
 # complementary auxiliary basis sets of F12 methods (files <B>-CABS are found
 # automatically: aug-cc-pVXZ-CABS = OptRI, cc-p(C)VXZ-F12-CABS)
-cabs: {}
+cabs:
+  aug-cc-pV(D+d)Z: aug-cc-pVDZ-CABS   # aug-cc-pV(X+d)Z: as for aug-cc-pVXZ
+  aug-cc-pV(T+d)Z: aug-cc-pVTZ-CABS
+  aug-cc-pV(Q+d)Z: aug-cc-pVQZ-CABS
+  aug-cc-pV(5+d)Z: aug-cc-pV5Z-CABS

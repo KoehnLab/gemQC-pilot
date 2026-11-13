@@ -46,6 +46,7 @@ V2 = gemqc._core.two_body_2c(ops["coulomb"], aux)          # (P|Q)
 B = gemqc._core.two_body_3c_mo(ops["f12"], aux, basis, Co, C)  # (P|f12|k q), MO (no AO array)
 fb12 = gemqc.FockBuilder(basis, 1e-12, ops["f12"])         # J/K and pair_jk with any operator
 K = gemqc._core.pair_integrals(ops["f12"], basis, ri, ri, Co, [(0, 1)])  # K(nu, si) = (nu i|f12|si j), nu, si in ri
+Y = gemqc._core.mo_integrals(ops["f12"], basis, Co, basis, Co, basis, Co, basis, Co)  # (i j|f12|k l), all MO
 ```
 
 ## Driver

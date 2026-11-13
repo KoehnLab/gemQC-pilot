@@ -10,7 +10,7 @@ from dataclasses import dataclass
 
 from . import _core
 
-KINDS = ("float", "int", "bool", "str", "choice", "list", "map", "basis", "any")
+KINDS = ("float", "int", "bool", "str", "choice", "choices", "list", "map", "basis", "any")
 
 
 class InputError(ValueError):
@@ -24,11 +24,12 @@ class Option:
     Attributes:
         name: Key in the input.
         kind: Value type, one of KINDS; list accepts a single value as a
-            one-element list, basis a name or a mapping per element/atom
+            one-element list, choices one choice or a list of distinct choices (a
+            list of lower-case strings), basis a name or a mapping per element/atom
             (basislib.assign_basis), any is checked by the task.
         default: Value if the key is not given (None: not set).
         doc: One-line description (Markdown).
-        choices: Allowed values of a choice option (lower case).
+        choices: Allowed values of a choice or choices option (lower case).
         unit: Unit of the value, e.g. 'bohr'.
         required: The key must be given.
     """
@@ -145,9 +146,11 @@ HF = SOLVER + GUESS + (
 # --- tasks --------------------------------------------------------------------------
 
 MP2_F12_OPTIONS = FROZEN + (
-    Option("approximation", "choice", "3c", "`3c` (coupling to the conventional "
-           "amplitudes, F C term in B) or `3*c` (without); both are printed",
-           ("3c", "3*c")),
+    Option("approximation", "choices", "3c", "`3c` (coupling to the conventional "
+           "amplitudes, F C term in B) or `3*c` (without), `3a`, `3*a`: approximation A "
+           "(no X term; not for mp2-f12xg-pilot); a value computes its pair (3C and 3*C, or "
+           "3A and 3*A), a list all named pairs; the first value is the main result",
+           ("3c", "3*c", "3a", "3*a")),
     Option("noz", "bool", False, "omit the Z terms of B (GBC in B; Molpro NOZ)"),
     Option("hy1", "bool", False, "omit the exchange terms of B evaluated by a double RI "
            "expansion (Molpro HY1; Molpro implies NOZ with HY1)"),
@@ -197,8 +200,9 @@ TASKS = {t.name: t for t in (
           Option("threshold", "float", 1e-12, "integral screening (mp2)"),
           C_AUXBASIS,
           SAVE)),
-    Task("mp2-f12", "MP2-F12 with fixed amplitudes (ansatz 3, approximations 3C and 3*C) on "
-         "top of the last SCF (RHF); exact integrals (small systems) or density fitting.",
+    Task("mp2-f12", "MP2-F12 with fixed amplitudes (ansatz 3, approximations 3C, 3*C, 3A, "
+         "3*A) on top of the last SCF (RHF); exact integrals (small systems) or density "
+         "fitting.",
          MP2_F12_OPTIONS),
     Task("mp2-f12xg-pilot", "F12XG pilot: MP2-F12 (fixed amplitudes, 3C/3*C) with one "
          "geminal per pair of basis-function groups, gamma_GH = (gt_G + gt_H)/2; exact "
@@ -297,7 +301,9 @@ def _number(value):
 
 
 def _convert(opt, value, where):
-    expected = f"one of {', '.join(opt.choices)}" if opt.choices else f"a {opt.kind} value"
+    expected = (f"one of {', '.join(opt.choices)}" if opt.kind == "choice" else
+                f"one or a list of distinct values of {', '.join(opt.choices)}"
+                if opt.kind == "choices" else f"a {opt.kind} value")
     bad = InputError(f"{where}: invalid value for '{opt.name}': {value!r} (expected "
                      f"{expected})")
     try:
@@ -320,6 +326,12 @@ def _convert(opt, value, where):
             if v not in opt.choices:
                 raise bad
             return v
+        if opt.kind == "choices":
+            vals = [str(v).lower() for v in (value if isinstance(value, (list, tuple))
+                                             else [value])]
+            if not vals or any(v not in opt.choices for v in vals) or len(set(vals)) < len(vals):
+                raise bad
+            return vals
         if opt.kind == "str":
             return str(value)
         if opt.kind == "list":
@@ -394,7 +406,8 @@ def markdown_table(options):
     """Markdown table of options (key, type, default, description) for the docs."""
     rows = ["| key | type | default | description |", "|---|---|---|---|"]
     for o in options:
-        kind = o.kind if o.kind != "choice" else " \\| ".join(o.choices)
+        kind = (" \\| ".join(o.choices) if o.kind == "choice" else
+                "list of " + " \\| ".join(o.choices) if o.kind == "choices" else o.kind)
         default = _fmt_default(o) + (f" {o.unit}" if o.unit and _fmt_default(o) else "")
         doc = o.doc + (f" ({o.unit})" if o.unit and not _fmt_default(o) else "")
         rows.append(f"| `{o.name}` | {kind} | {default} | {doc} |")
