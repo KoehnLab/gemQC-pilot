@@ -7,6 +7,8 @@ name = "gemqc-pilot"
 version = "1.1.0"
 description = "gemQC-pilot - reduced gemQC for new F12 methods (SCF, MP2, MP2-F12, F12XG pilot)"
 authors = [{name = "A. Koehn"}]
+license = "BSD-3-Clause"
+license-files = ["LICENSE", "lib/basis/README.md"]
 requires-python = ">=3.10"
 dependencies = ["numpy", "scipy", "pyyaml", "h5py"]
 

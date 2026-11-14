@@ -67,5 +67,5 @@ install(TARGETS _core LIBRARY DESTINATION gemqc)
 # basis set library in the package (regular install; the editable one uses lib/basis)
 if(NOT SKBUILD_STATE STREQUAL "editable")
   install(DIRECTORY lib/basis/ DESTINATION gemqc/basis
-          FILES_MATCHING PATTERN "*.json" PATTERN "*.yaml")
+          FILES_MATCHING PATTERN "*.json" PATTERN "*.yaml" PATTERN "README.md")
 endif()

@@ -119,6 +119,13 @@ docs/           documentation (Sphinx, MyST Markdown)
 tests/          pytest suite
 ```
 
+## License
+
+gemQC-pilot is distributed under the BSD 3-Clause License (`LICENSE`). The basis set
+data files in `lib/basis` (`*.json`) are not covered by it: they are taken from, or
+derived from, the Basis Set Exchange and are included for convenience only (see
+`lib/basis/README.md`). To cite gemQC-pilot, see `CITATION.cff`.
+
 ## References
 
 Please cite the software and data used:
